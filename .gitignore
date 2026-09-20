@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Bible data: downloaded sources and the DB generated from them
+data/sources
+src-tauri/resources/bible.db

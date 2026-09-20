@@ -14,12 +14,14 @@
 - Scaffolded with `create-tauri-app`, demo code removed.
 - **Done when:** an empty window opens with `npm run tauri dev`.
 
-## Phase 1: Data layer (1-2 days)
+## Phase 1: Data layer (done)
 - Find public domain Bible data (JSON or USFM) and write an import script.
 - Schema: `translations`, `books`, `verses(translation, book, chapter, verse, text)`.
 - Build an FTS5 index over the verse text.
 - Add a separate `user.db` (in the app data dir) for notes, highlights and bookmarks.
 - **Done when:** a Rust command returns any chapter and a search query returns results.
+- **Result:** `scripts/build-bible-db.mjs` builds `bible.db` from eBible.org USFX (KJV 31,102 verses, WEB 31,098). Rust commands: `list_translations`, `list_books`, `get_chapter`, `search`. Covered by `cargo test`.
+- **Known gaps for later phases:** Psalm superscriptions and section headings are not imported. The WEB omits five verses (Luke 17:36, Acts 8:37, 15:34, 24:7, Rom 16:25) and places the Romans doxology at 14:24-26, so compare view must handle numbering gaps. The USFX sources also carry Strong's numbers and cross-references (Phase 5).
 
 ## Phase 2: Reader (2-3 days)
 - Book and chapter picker, verse rendering, previous/next chapter, keyboard shortcuts.
