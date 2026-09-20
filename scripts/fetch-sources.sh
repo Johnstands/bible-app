@@ -14,4 +14,3 @@ fetch() {
 }
 
 fetch eng-kjv2006
-fetch eng-web

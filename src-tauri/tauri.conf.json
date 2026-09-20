@@ -12,9 +12,13 @@
   "app": {
     "windows": [
       {
-        "title": "bible-app",
-        "width": 800,
-        "height": 600
+        "title": "Bible",
+        "width": 960,
+        "height": 800,
+        "minWidth": 480,
+        "minHeight": 400,
+        "center": true,
+        "backgroundColor": "#faf6ec"
       }
     ],
     "security": {

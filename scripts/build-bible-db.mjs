@@ -7,10 +7,8 @@ import { DatabaseSync } from "node:sqlite";
 const ROOT = path.resolve(import.meta.dirname, "..");
 const OUT = path.join(ROOT, "src-tauri/resources/bible.db");
 
-const TRANSLATIONS = [
-  { id: "KJV", name: "King James Version", source: "eng-kjv2006" },
-  { id: "WEB", name: "World English Bible", source: "eng-web" },
-];
+// `verses` is the known verse count, used as an import sanity check.
+const TRANSLATIONS = [{ id: "KJV", name: "King James Version", source: "eng-kjv2006", verses: 31102 }];
 
 // [usfx code, name, abbreviation, chapter count]; array index + 1 is the book id.
 const BOOKS = [
@@ -49,17 +47,28 @@ const decode = (s) =>
 const SKIP = new Set(["f", "x", "fig", "s", "r", "ms", "mr", "sp", "cl", "cp", "rq"]);
 // Elements that break the line, so adjacent words must not be glued together.
 const BREAK = new Set(["p", "q", "b", "l", "li", "d"]);
+// Headings between verses: <d> is a Psalm title, <s> a section heading.
+const HEADING = { d: "title", s: "section" };
 
-/** Parses one USFX file into [{book, chapter, verse, verseEnd, text}] for the 66 canonical books. */
+const clean = (s) => s.replace(/¶/g, "").replace(/\s+/g, " ").trim();
+
+/**
+ * Parses one USFX file into verses for the 66 canonical books:
+ * {book, chapter, verse, verseEnd, text, kind, newBlock, gap, heading, headingKind, subscription}.
+ * `kind` is the enclosing block ('p' paragraph or 'q' poetry line), `newBlock` is set when the verse
+ * opens that block, `gap` when a stanza break precedes it. A heading applies to the verse that follows
+ * it, except a heading at the very end of a book (an epistle's subscription), which is attached to
+ * the last verse.
+ */
 function parseUsfx(file) {
   const xml = fs.readFileSync(file, "utf8");
   const verses = [];
   let book = null, chapter = 0, cur = null, skipDepth = 0;
-  const stack = [];
+  let kind = "p", inBlock = false, blockOpened = false, gap = false, heading = null, pending = null;
 
   const finish = () => {
     if (!cur) return;
-    cur.text = cur.text.replace(/¶/g, "").replace(/\s+/g, " ").trim();
+    cur.text = clean(cur.text);
     verses.push(cur);
     cur = null;
   };
@@ -67,12 +76,24 @@ function parseUsfx(file) {
   for (const m of xml.matchAll(/<(\/?)([A-Za-z0-9]+)([^>]*?)(\/?)>|([^<]+)/g)) {
     const [, closing, name, attrs, selfClose, text] = m;
     if (text !== undefined) {
-      if (cur && !skipDepth) cur.text += decode(text);
+      if (skipDepth) continue;
+      if (cur) cur.text += decode(text);
+      else if (heading) heading.text += decode(text);
       continue;
     }
     if (closing) {
-      stack.pop();
+      if (heading && name === heading.tag) {
+        pending = { text: clean(heading.text), kind: HEADING[name] };
+        heading = null;
+        continue;
+      }
       if (SKIP.has(name) && skipDepth) skipDepth--;
+      if (name === "p" || name === "q") inBlock = false;
+      if (name === "book") {
+        finish();
+        if (pending && verses.length) verses[verses.length - 1].subscription = pending.text;
+        pending = null;
+      }
       if (BREAK.has(name) && cur && !skipDepth) cur.text += " ";
       continue;
     }
@@ -80,20 +101,40 @@ function parseUsfx(file) {
       finish();
       book = BOOK_ID.get(/id="([^"]+)"/.exec(attrs)?.[1]) ?? null;
       chapter = 0;
+      inBlock = false;
+      gap = false;
+      pending = null;
     } else if (name === "c") {
       finish();
       chapter = +/id="(\d+)"/.exec(attrs)[1];
+      inBlock = false;
+    } else if ((name === "p" && !/style="m/.test(attrs)) || name === "q") {
+      finish();
+      kind = name;
+      inBlock = true;
+      blockOpened = true;
+    } else if (name === "b") {
+      gap = true;
     } else if (name === "v") {
       finish();
       const [, a, b] = /id="(\d+)(?:-(\d+))?"/.exec(attrs);
-      if (book && chapter) cur = { book, chapter, verse: +a, verseEnd: b ? +b : null, text: "" };
+      if (book && chapter) {
+        cur = {
+          book, chapter, verse: +a, verseEnd: b ? +b : null, text: "",
+          kind: inBlock ? kind : "p", newBlock: blockOpened || !inBlock, gap,
+          heading: pending?.text ?? null, headingKind: pending?.kind ?? null, subscription: null,
+        };
+      }
+      blockOpened = false;
+      gap = false;
+      pending = null;
     } else if (name === "ve") {
       finish();
+    } else if (name in HEADING && !cur) {
+      heading = { tag: name, text: "" };
+      continue; // its content is captured, not skipped
     }
-    if (!selfClose) {
-      stack.push(name);
-      if (SKIP.has(name)) skipDepth++;
-    }
+    if (!selfClose && SKIP.has(name)) skipDepth++;
     if (BREAK.has(name) && cur && !skipDepth) cur.text += " ";
   }
   finish();
@@ -122,6 +163,12 @@ db.exec(`
     verse INTEGER NOT NULL,
     verse_end INTEGER,                -- set when the source merges several verses (e.g. 15-16)
     text TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK (kind IN ('p', 'q')),  -- enclosing block: paragraph or poetry line
+    new_block INTEGER NOT NULL,       -- 1 when this verse opens a new paragraph or poetry line
+    gap INTEGER NOT NULL,             -- 1 when a stanza break (blank line) precedes it
+    heading TEXT,                     -- heading shown before the verse (Psalm title, Hebrew letter)
+    heading_kind TEXT CHECK (heading_kind IN ('title', 'section')),
+    subscription TEXT,                -- closing note after the verse (an epistle's subscription)
     UNIQUE (translation, book, chapter, verse)
   );
   CREATE VIRTUAL TABLE verses_fts USING fts5(
@@ -135,18 +182,22 @@ BOOKS.forEach(([code, name, abbrev, chapters], i) =>
 
 const insTr = db.prepare("INSERT INTO translations VALUES (?, ?)");
 const insVerse = db.prepare(
-  "INSERT INTO verses (translation, book, chapter, verse, verse_end, text) VALUES (?, ?, ?, ?, ?, ?)");
+  "INSERT INTO verses (translation, book, chapter, verse, verse_end, text, kind, new_block, gap, heading, heading_kind, subscription) " +
+  "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
 for (const t of TRANSLATIONS) {
   const file = path.join(ROOT, "data/sources", t.source, `${t.source}_usfx.xml`);
   if (!fs.existsSync(file)) throw new Error(`Missing ${file} - run npm run data:fetch first`);
   const parsed = parseUsfx(file);
-  // Some translations leave a verse number in place but omit the text (e.g. Acts 8:37 in the WEB).
+  // Some translations leave a verse number in place but omit the text; skip those rows.
   const verses = parsed.filter((v) => v.text);
   const omitted = parsed.filter((v) => !v.text).map((v) => `${BOOKS[v.book - 1][0]} ${v.chapter}:${v.verse}`);
   insTr.run(t.id, t.name);
   db.exec("BEGIN");
-  for (const v of verses) insVerse.run(t.id, v.book, v.chapter, v.verse, v.verseEnd, v.text);
+  for (const v of verses) {
+    insVerse.run(t.id, v.book, v.chapter, v.verse, v.verseEnd, v.text, v.kind, +v.newBlock, +v.gap,
+      v.heading, v.headingKind, v.subscription);
+  }
   db.exec("COMMIT");
   console.log(`${t.id}: ${verses.length} verses` + (omitted.length ? ` (omitted, no text: ${omitted.join(", ")})` : ""));
 }
@@ -155,24 +206,17 @@ db.exec("INSERT INTO verses_fts(rowid, text) SELECT id, text FROM verses");
 db.exec("INSERT INTO verses_fts(verses_fts) VALUES ('optimize')");
 db.exec("CREATE INDEX verses_ref ON verses (book, chapter, verse)");
 
-// Validation: chapter counts per book, empty verses, and KJV/WEB numbering differences.
+// Validation: verse total and chapter counts per book.
 let problems = 0;
 const bad = (msg) => { problems++; console.error("PROBLEM:", msg); };
 for (const t of TRANSLATIONS) {
+  const total = db.prepare("SELECT COUNT(*) AS n FROM verses WHERE translation = ?").get(t.id).n;
+  if (total !== t.verses) bad(`${t.id}: ${total} verses, expected ${t.verses}`);
   const rows = db.prepare(
     "SELECT b.code, b.chapters AS want, MAX(v.chapter) AS got, COUNT(DISTINCT v.chapter) AS n " +
     "FROM books b LEFT JOIN verses v ON v.book = b.id AND v.translation = ? GROUP BY b.id").all(t.id);
   for (const r of rows) if (r.got !== r.want || r.n !== r.want) bad(`${t.id} ${r.code}: chapters ${r.n}/${r.got}, expected ${r.want}`);
 }
-const diffs = db.prepare(`
-  SELECT b.code, k.chapter, k.n AS kjv, w.n AS web FROM
-    (SELECT book, chapter, COUNT(*) n FROM verses WHERE translation = 'KJV' GROUP BY book, chapter) k
-    JOIN (SELECT book, chapter, MAX(COALESCE(verse_end, verse)) n FROM verses WHERE translation = 'WEB' GROUP BY book, chapter) w
-      USING (book, chapter)
-    JOIN books b ON b.id = k.book
-  WHERE k.n != w.n`).all();
-console.log(`KJV/WEB chapters with different verse counts: ${diffs.length}`);
-for (const d of diffs) console.log(`  ${d.code} ${d.chapter}: KJV ${d.kjv}, WEB ${d.web}`);
 
 db.exec("VACUUM");
 db.close();

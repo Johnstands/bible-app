@@ -5,7 +5,7 @@
 |---|---|
 | Frontend | React + Vite + TypeScript |
 | Storage | SQLite (bundled Bible DB plus a separate user DB) |
-| Translations at launch | KJV and WEB (public domain) |
+| Translation | KJV only (public domain). The schema keeps a `translation` column, so adding one later is an import-script change. |
 | Platforms | Linux first, then Windows and macOS. Mobile later. |
 | Online features | None in v1 (offline-first) |
 
@@ -20,14 +20,15 @@
 - Build an FTS5 index over the verse text.
 - Add a separate `user.db` (in the app data dir) for notes, highlights and bookmarks.
 - **Done when:** a Rust command returns any chapter and a search query returns results.
-- **Result:** `scripts/build-bible-db.mjs` builds `bible.db` from eBible.org USFX (KJV 31,102 verses, WEB 31,098). Rust commands: `list_translations`, `list_books`, `get_chapter`, `search`. Covered by `cargo test`.
-- **Known gaps for later phases:** Psalm superscriptions and section headings are not imported. The WEB omits five verses (Luke 17:36, Acts 8:37, 15:34, 24:7, Rom 16:25) and places the Romans doxology at 14:24-26, so compare view must handle numbering gaps. The USFX sources also carry Strong's numbers and cross-references (Phase 5).
+- **Result:** `scripts/build-bible-db.mjs` builds `bible.db` from eBible.org USFX (KJV, 31,102 verses). Rust commands: `list_translations`, `list_books`, `get_chapter`, `search`. Covered by `cargo test`.
+- **Known gaps for later phases:** Psalm superscriptions and section headings are not imported. The USFX source also carries Strong's numbers and cross-references (Phase 5).
 
-## Phase 2: Reader (2-3 days)
+## Phase 2: Reader (done)
 - Book and chapter picker, verse rendering, previous/next chapter, keyboard shortcuts.
 - Reference jump box ("jn 3:16").
 - Remember the last position.
 - **Done when:** you can read the whole Bible comfortably.
+- **Result:** paragraphs, poetry lines, stanza breaks, Psalm titles, Psalm 119 letter headings and epistle subscriptions render from the imported structure (`Chapter.tsx`). The Go-to panel (`/` or Ctrl+K, or click the location) is both the jump box and a book/chapter browser; `reference.ts` parses "jn 3:16", "1 cor 13", "ps 23:1-3" and unique prefixes, with tests. Arrow keys move between chapters across books, a jump to a verse scrolls to it and washes it in gold, and the last chapter and scroll position are restored on launch (`localStorage`). The `t` key cycles themes until Phase 4 adds settings.
 
 ## Phase 3: Search (1-2 days)
 - Full-text search with highlighted matches and result snippets.
@@ -40,7 +41,6 @@
 - A verse of the day.
 
 ## Phase 5: Depth features (3-5 days)
-- Side-by-side translation compare.
 - Reading plans with progress tracking.
 - Cross-references and a copy or share verse card.
 - Optional: audio, or Strong's and lexicon data.
@@ -52,5 +52,5 @@
 
 ## Risks
 - **Licensing:** stick to public domain until you have licenses for modern translations.
-- **Data quality:** verse numbering differs between translations, so validate the imports.
+- **Data quality:** validate imports against known verse and chapter counts.
 - **Scope creep:** ship Phases 0-4 as v1.

@@ -1,18 +1,440 @@
-:root {
-  font-family: system-ui, sans-serif;
-  color: #1a1a1a;
-  background-color: #fafafa;
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    color: #e8e8e8;
-    background-color: #1c1c1e;
+html {
+  background: var(--bg);
+  transition: background-color var(--dur-slow) var(--ease);
+}
+
+body {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-scripture);
+  font-size: 1.3rem;
+  line-height: 1.65;
+  font-kerning: normal;
+  font-feature-settings: "liga", "kern";
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  transition: color var(--dur-slow) var(--ease);
+}
+
+::selection {
+  background: var(--selection);
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+/* ---- Top bar: fades away while reading ---- */
+
+.topbar {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 3.25rem;
+  padding: 0 1.5rem;
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  letter-spacing: 0.02em;
+  background: var(--bg);
+  border-bottom: 1px solid var(--rule);
+  transition:
+    opacity var(--dur-slow) var(--ease),
+    background-color var(--dur-slow) var(--ease),
+    border-color var(--dur-slow) var(--ease);
+}
+
+.topbar.is-idle:not(:hover):not(:focus-within) {
+  opacity: 0;
+}
+
+.location {
+  color: var(--ink);
+  font-weight: 500;
+  transition: color var(--dur-fast) var(--ease);
+}
+
+.location:hover {
+  color: var(--accent);
+}
+
+.translation {
+  color: var(--ink-muted);
+  letter-spacing: 0.08em;
+}
+
+/* ---- Chapter ---- */
+
+.page {
+  padding: 7rem 1.5rem 6rem;
+}
+
+.settle {
+  animation: settle var(--dur-base) var(--ease) both;
+}
+
+.chapter {
+  max-width: 27em;
+  margin: 0 auto;
+}
+
+@keyframes settle {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
   }
 }
 
-.container {
+.book-name {
   margin: 0;
-  padding: 10vh 2rem;
   text-align: center;
+  font-size: 1.05rem;
+  font-weight: 500;
+  font-variant-caps: all-small-caps;
+  letter-spacing: 0.28em;
+  color: var(--ink-muted);
+}
+
+/* Hairline with a small diamond at its centre. */
+.ornament {
+  position: relative;
+  width: 3.5rem;
+  height: 1px;
+  margin: 1.1rem auto 2.4rem;
+  background: var(--gold);
+  opacity: 0.7;
+}
+
+.ornament::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  background: var(--bg);
+  border: 1px solid var(--gold);
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.para,
+.line {
+  margin: 0;
+  hanging-punctuation: first;
+  text-wrap: pretty;
+  hyphens: manual;
+}
+
+/* Paragraphs are marked by indentation, as in a printed Bible; the first after a heading is flush. */
+.para {
+  text-indent: 1.5em;
+}
+
+.para.first {
+  text-indent: 0;
+}
+
+/* Each poetry line hangs, so wrapped lines tuck in under the first. */
+.line {
+  padding-left: 1.6em;
+  text-indent: -1.6em;
+}
+
+.line.stanza {
+  margin-top: 1.1em;
+}
+
+/* Psalm chapters centre the number above the title instead of dropping it into the text. */
+.chapter-numeral {
+  margin-top: 0.15em;
+  text-align: center;
+  font-size: 3.2rem;
+  line-height: 1;
+  font-variant-numeric: lining-nums;
+  color: var(--accent);
+}
+
+.superscription,
+.subscription {
+  margin: 0 0 1.5em;
+  text-align: center;
+  font-size: 1.05rem;
+  line-height: 1.5;
+  font-style: italic;
+  color: var(--ink-muted);
+}
+
+.subscription {
+  margin: 2.2em 0 0;
+}
+
+.section-heading {
+  margin: 1.9em 0 0.6em;
+  text-align: center;
+  font-size: 0.95rem;
+  font-weight: 500;
+  font-variant-caps: all-small-caps;
+  letter-spacing: 0.22em;
+  color: var(--ink-muted);
+}
+
+/* Soft gold wash marking a verse reached by a jump; it fades like ink drying. */
+.verse.is-target {
+  border-radius: 3px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  animation: flash calc(var(--dur-slow) * 4.5) var(--ease) both;
+}
+
+@keyframes flash {
+  0%,
+  55% {
+    background: color-mix(in srgb, var(--gold) 38%, transparent);
+  }
+  100% {
+    background: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .verse.is-target {
+    animation: none;
+    background: color-mix(in srgb, var(--gold) 30%, transparent);
+  }
+}
+
+/* The chapter number stands in for verse 1's number, as in a printed Bible. */
+.dropnum {
+  float: left;
+  margin: 0.04em 0.12em 0 0;
+  font-size: 4.4em;
+  line-height: 0.74;
+  font-weight: 400;
+  font-variant-numeric: lining-nums;
+  color: var(--accent);
+}
+
+.vn {
+  position: relative;
+  top: -0.42em;
+  margin-right: 0.18em;
+  font-size: 0.6em;
+  line-height: 0;
+  font-weight: 500;
+  font-variant-numeric: lining-nums;
+  color: var(--ink-muted);
+  user-select: none;
+}
+
+.chapter-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4rem;
+  padding-top: 1.75rem;
+  border-top: 1px solid var(--rule);
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  letter-spacing: 0.02em;
+}
+
+.chapter-nav button {
+  color: var(--ink-muted);
+  transition: color var(--dur-fast) var(--ease);
+}
+
+.chapter-nav button:hover {
+  color: var(--accent);
+}
+
+.status {
+  margin: 30vh auto 0;
+  max-width: 27em;
+  text-align: center;
+  font-style: italic;
+  color: var(--ink-muted);
+}
+
+/* ---- Go to panel ---- */
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 10vh 1rem 0;
+  background: color-mix(in srgb, var(--ink) 24%, transparent);
+  animation: fade var(--dur-base) var(--ease) both;
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+
+.goto {
+  display: flex;
+  flex-direction: column;
+  width: min(38rem, 100%);
+  max-height: 72vh;
+  overflow: hidden;
+  background: var(--bg);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  font-family: var(--font-ui);
+  animation: rise var(--dur-base) var(--ease) both;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.985);
+  }
+}
+
+.goto-input {
+  width: 100%;
+  padding: 1.1rem 1.5rem;
+  font-family: var(--font-scripture);
+  font-size: 1.4rem;
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--rule);
+  outline: none;
+}
+
+.goto-input::placeholder {
+  font-style: italic;
+  color: var(--ink-muted);
+  opacity: 0.8;
+}
+
+.goto-browse {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: 0;
+  height: 22rem;
+}
+
+.goto-books,
+.goto-results {
+  overflow-y: auto;
+  padding: 0.5rem 0;
+}
+
+.goto-books {
+  border-right: 1px solid var(--rule);
+}
+
+.goto-group {
+  padding: 0.9rem 1.5rem 0.35rem;
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.goto-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  width: 100%;
+  padding: 0.35rem 1.5rem;
+  font-family: var(--font-scripture);
+  font-size: 1.1rem;
+  text-align: left;
+  border-left: 2px solid transparent;
+  transition: color var(--dur-fast) var(--ease);
+}
+
+.goto-row:hover:not(:disabled),
+.goto-row[aria-selected="true"] {
+  color: var(--accent);
+}
+
+.goto-row[aria-selected="true"] {
+  border-left-color: var(--accent);
+}
+
+.goto-row:disabled {
+  color: var(--ink-muted);
+  font-style: italic;
+  cursor: default;
+}
+
+.goto-hint-key {
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  color: var(--ink-muted);
+}
+
+.goto-chapters {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(2.7rem, 1fr));
+  align-content: start;
+  gap: 0.15rem;
+  padding: 0.9rem 1rem;
+  overflow-y: auto;
+}
+
+.goto-chapter {
+  padding: 0.3rem 0;
+  font-family: var(--font-scripture);
+  font-size: 1.1rem;
+  font-variant-numeric: lining-nums;
+  text-align: center;
+  color: var(--ink-muted);
+  border-bottom: 1.5px solid transparent;
+  transition: color var(--dur-fast) var(--ease);
+}
+
+.goto-chapter:hover {
+  color: var(--accent);
+}
+
+.goto-chapter[aria-current="true"] {
+  color: var(--ink);
+  border-bottom-color: var(--accent);
+}
+
+.goto-empty {
+  margin: 0;
+  padding: 0.9rem 1.5rem;
+  font-style: italic;
+  color: var(--ink-muted);
+}
+
+.goto-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.6rem 1.5rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+  color: var(--ink-muted);
+  border-top: 1px solid var(--rule);
 }

@@ -46,6 +46,18 @@ pub struct Verse {
     /// Set when the source merges several verses into one (e.g. "15-16").
     pub verse_end: Option<u32>,
     pub text: String,
+    /// The enclosing block: `p` (prose paragraph) or `q` (poetry line).
+    pub kind: String,
+    /// True when this verse opens a new paragraph or poetry line.
+    pub new_block: bool,
+    /// True when a stanza break (blank line) precedes this verse.
+    pub gap: bool,
+    /// A heading shown before the verse: a Psalm title or a section heading.
+    pub heading: Option<String>,
+    /// `title` or `section`, set whenever `heading` is.
+    pub heading_kind: Option<String>,
+    /// A closing note shown after the verse (an epistle's subscription).
+    pub subscription: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -146,11 +158,22 @@ pub fn get_chapter(
     chapter: u32,
 ) -> Result<Vec<Verse>> {
     let mut stmt = conn.prepare_cached(
-        "SELECT verse, verse_end, text FROM verses
+        "SELECT verse, verse_end, text, kind, new_block, gap, heading, heading_kind, subscription
+         FROM verses
          WHERE translation = ?1 AND book = ?2 AND chapter = ?3 ORDER BY verse",
     )?;
     let rows = stmt.query_map(params![translation, book, chapter], |r| {
-        Ok(Verse { verse: r.get(0)?, verse_end: r.get(1)?, text: r.get(2)? })
+        Ok(Verse {
+            verse: r.get(0)?,
+            verse_end: r.get(1)?,
+            text: r.get(2)?,
+            kind: r.get(3)?,
+            new_block: r.get(4)?,
+            gap: r.get(5)?,
+            heading: r.get(6)?,
+            heading_kind: r.get(7)?,
+            subscription: r.get(8)?,
+        })
     })?;
     Ok(rows.collect::<rusqlite::Result<_>>()?)
 }
@@ -232,7 +255,7 @@ mod tests {
         assert_eq!((books[0].name.as_str(), books[0].testament.as_str()), ("Genesis", "OT"));
         assert_eq!((books[42].name.as_str(), books[42].chapters), ("John", 21));
         let ids: Vec<_> = list_translations(&conn).unwrap().into_iter().map(|t| t.id).collect();
-        assert_eq!(ids, ["KJV", "WEB"]);
+        assert_eq!(ids, ["KJV"]);
     }
 
     #[test]
@@ -243,21 +266,44 @@ mod tests {
         assert_eq!(john3[15].verse, 16);
         assert!(john3[15].text.starts_with("For God so loved the world"));
         assert!(john3.windows(2).all(|w| w[0].verse < w[1].verse));
-        let psalm119 = get_chapter(&conn, "WEB", 19, 119).unwrap();
+        let psalm119 = get_chapter(&conn, "KJV", 19, 119).unwrap();
         assert_eq!(psalm119.len(), 176);
         assert!(get_chapter(&conn, "KJV", 43, 99).unwrap().is_empty());
         assert!(get_chapter(&conn, "NOPE", 43, 3).unwrap().is_empty());
     }
 
     #[test]
-    fn translations_differ_where_manuscripts_differ() {
+    fn prose_chapters_carry_paragraph_breaks() {
         let conn = bible();
-        // Acts 8:37 is present in the KJV and omitted from the WEB.
-        let has = |tr, verse| {
-            get_chapter(&conn, tr, 44, 8).unwrap().iter().any(|v| v.verse == verse)
-        };
-        assert!(has("KJV", 37));
-        assert!(!has("WEB", 37));
+        let john3 = get_chapter(&conn, "KJV", 43, 3).unwrap();
+        assert!(john3.iter().all(|v| v.kind == "p" && !v.gap));
+        assert!(john3[0].new_block && !john3[1].new_block);
+        assert!(john3[15].new_block); // "For God so loved the world" opens a paragraph
+    }
+
+    #[test]
+    fn psalms_carry_poetry_titles_and_stanzas() {
+        let conn = bible();
+        let ps3 = get_chapter(&conn, "KJV", 19, 3).unwrap();
+        assert!(ps3.iter().all(|v| v.kind == "q" && v.new_block));
+        assert_eq!(ps3[0].heading.as_deref(), Some("A Psalm of David, when he fled from Absalom his son."));
+        assert_eq!(ps3[0].heading_kind.as_deref(), Some("title"));
+        assert!(ps3[3].gap && !ps3[2].gap); // stanza break before verse 4
+
+        let ps119 = get_chapter(&conn, "KJV", 19, 119).unwrap();
+        assert_eq!(ps119[8].heading.as_deref(), Some("ב BETH.")); // verse 9
+        assert_eq!(ps119[8].heading_kind.as_deref(), Some("section"));
+    }
+
+    #[test]
+    fn epistle_subscriptions_attach_to_the_last_verse() {
+        let conn = bible();
+        let rom16 = get_chapter(&conn, "KJV", 45, 16).unwrap();
+        let last = rom16.last().unwrap();
+        assert!(last.subscription.as_deref().unwrap().starts_with("Written to the Romans"));
+        assert!(rom16.iter().rev().skip(1).all(|v| v.subscription.is_none()));
+        // ...and not on the first verse of the next book.
+        assert!(get_chapter(&conn, "KJV", 46, 1).unwrap()[0].heading.is_none());
     }
 
     #[test]
@@ -267,9 +313,7 @@ mod tests {
         assert_eq!((hits[0].book_name.as_str(), hits[0].chapter, hits[0].verse), ("Psalms", 23, 1));
         assert!(hits.iter().all(|h| h.translation == "KJV"));
 
-        let all = search(&conn, "shepherd", None, 500).unwrap();
-        assert!(all.iter().any(|h| h.translation == "KJV"));
-        assert!(all.iter().any(|h| h.translation == "WEB"));
+        assert!(search(&conn, "shepherd", Some("NOPE"), 10).unwrap().is_empty());
 
         // Stemming and prefix matching: "loving kind" finds "lovingkindness".
         assert!(!search(&conn, "loving kind", Some("KJV"), 5).unwrap().is_empty());

@@ -1,0 +1,54 @@
+/* Design tokens. Themes only override colors; type, spacing and motion are shared. */
+:root,
+:root[data-theme="paper"] {
+  --bg: #faf6ec;
+  --ink: #2a2622;
+  --ink-muted: #7a7163;
+  --rule: #ddd2b9;
+  --accent: #7a2e2e;
+  --gold: #b08d4a;
+  --selection: #eadfb8;
+}
+
+:root[data-theme="sepia"] {
+  --bg: #f0e4cc;
+  --ink: #3b2f22;
+  --ink-muted: #76664e;
+  --rule: #d2bf9a;
+  --accent: #7a2e2e;
+  --gold: #9a7534;
+  --selection: #e2ce9f;
+}
+
+:root[data-theme="dark"] {
+  --bg: #1c1917;
+  --ink: #e8dfcb;
+  --ink-muted: #9a9080;
+  --rule: #3a342d;
+  --accent: #c9a45c;
+  --gold: #c9a45c;
+  --selection: #3d352a;
+}
+
+:root {
+  --font-scripture: "EB Garamond Variable", "EB Garamond", Georgia, serif;
+  --font-ui: "Inter Variable", "Inter", system-ui, sans-serif;
+
+  --dur-fast: 180ms;
+  --dur-base: 240ms;
+  --dur-slow: 400ms;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 0.01ms;
+    --dur-base: 0.01ms;
+    --dur-slow: 0.01ms;
+  }
+}
