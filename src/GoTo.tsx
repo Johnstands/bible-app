@@ -13,17 +13,20 @@ interface Row {
   label: string;
   hint?: string;
   go?: Destination;
+  /** Hands the typed text to the search panel instead of navigating. */
+  search?: boolean;
 }
 
 interface Props {
   books: Book[];
   current: Position;
   onGo: (dest: Destination) => void;
+  onSearch: (query: string) => void;
   onClose: () => void;
 }
 
 /** A jump box ("jn 3:16") that doubles as a book and chapter browser while it is empty. */
-export function GoTo({ books, current, onGo, onClose }: Props) {
+export function GoTo({ books, current, onGo, onSearch, onClose }: Props) {
   const [query, setQuery] = useState("");
   const [browsed, setBrowsed] = useState(current.book);
   const [active, setActive] = useState(0);
@@ -38,22 +41,27 @@ export function GoTo({ books, current, onGo, onClose }: Props) {
 
   const rows = useMemo<Row[]>(() => {
     const parsed = parseReference(query, books);
+    let found: Row[] = [];
     switch (parsed.kind) {
       case "ref": {
         const { book, chapter, verse, verseEnd } = parsed;
         const label = `${chapterTitle(book)} ${chapter}${verse ? `:${verse}${verseEnd ? `–${verseEnd}` : ""}` : ""}`;
-        return [{ label, hint: "↵", go: { book: book.id, chapter, verse, verseEnd } }];
+        found = [{ label, hint: "↵", go: { book: book.id, chapter, verse, verseEnd } }];
+        break;
       }
       case "books":
-        return parsed.books.map((b) => {
+        found = parsed.books.map((b) => {
           const chapter = Math.min(parsed.chapter ?? 1, b.chapters);
           return { label: `${b.name}${parsed.chapter ? ` ${chapter}` : ""}`, go: { book: b.id, chapter } };
         });
+        break;
       case "invalid":
-        return [{ label: parsed.message }];
-      default:
-        return [];
+        found = [{ label: parsed.message }];
+        break;
     }
+    // Anything typed can also be searched for, so "job" can mean the book or the word.
+    const text = query.trim();
+    return text ? [...found, { label: `Search for “${text}”`, hint: "Ctrl+F", search: true }] : found;
   }, [query, books]);
 
   const browsing = query.trim() === "";
@@ -66,7 +74,19 @@ export function GoTo({ books, current, onGo, onClose }: Props) {
     listRef.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: "nearest" });
   }, [active, browsed, browsing]);
 
+  const choose = (row: Row) => {
+    if (row.search) onSearch(query.trim());
+    else if (row.go) onGo(row.go);
+  };
+
   const onKeyDown = (e: React.KeyboardEvent) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f") {
+      // Stop here so the app's own Ctrl+F handler doesn't reopen search without the typed text.
+      e.preventDefault();
+      e.stopPropagation();
+      onSearch(query.trim());
+      return;
+    }
     if (e.key === "Escape") {
       e.preventDefault();
       onClose();
@@ -84,7 +104,7 @@ export function GoTo({ books, current, onGo, onClose }: Props) {
     } else if (e.key === "Enter") {
       e.preventDefault();
       if (browsing) onGo({ book: browsed, chapter: 1 });
-      else if (rows[active]?.go) onGo(rows[active].go);
+      else if (rows[active]) choose(rows[active]);
     }
   };
 
@@ -150,15 +170,14 @@ export function GoTo({ books, current, onGo, onClose }: Props) {
           </div>
         ) : (
           <div className="goto-results" role="listbox" ref={listRef}>
-            {rows.length === 0 && <p className="goto-empty">No matching book</p>}
             {rows.map((row, i) => (
               <button
                 key={row.label}
                 role="option"
                 aria-selected={i === active}
-                disabled={!row.go}
+                disabled={!row.go && !row.search}
                 className="goto-row"
-                onClick={() => row.go && onGo(row.go)}
+                onClick={() => choose(row)}
                 onMouseMove={() => setActive(i)}
                 tabIndex={-1}
               >

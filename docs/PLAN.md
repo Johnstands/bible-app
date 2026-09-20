@@ -21,7 +21,7 @@
 - Add a separate `user.db` (in the app data dir) for notes, highlights and bookmarks.
 - **Done when:** a Rust command returns any chapter and a search query returns results.
 - **Result:** `scripts/build-bible-db.mjs` builds `bible.db` from eBible.org USFX (KJV, 31,102 verses). Rust commands: `list_translations`, `list_books`, `get_chapter`, `search`. Covered by `cargo test`.
-- **Known gaps for later phases:** Psalm superscriptions and section headings are not imported. The USFX source also carries Strong's numbers and cross-references (Phase 5).
+- **Known gaps for later phases:** the KJV source tags words with Strong's numbers (Phase 5 option) but has no cross-references, so those need another public-domain source.
 
 ## Phase 2: Reader (done)
 - Book and chapter picker, verse rendering, previous/next chapter, keyboard shortcuts.
@@ -30,10 +30,11 @@
 - **Done when:** you can read the whole Bible comfortably.
 - **Result:** paragraphs, poetry lines, stanza breaks, Psalm titles, Psalm 119 letter headings and epistle subscriptions render from the imported structure (`Chapter.tsx`). The Go-to panel (`/` or Ctrl+K, or click the location) is both the jump box and a book/chapter browser; `reference.ts` parses "jn 3:16", "1 cor 13", "ps 23:1-3" and unique prefixes, with tests. Arrow keys move between chapters across books, a jump to a verse scrolls to it and washes it in gold, and the last chapter and scroll position are restored on launch (`localStorage`). The `t` key cycles themes until Phase 4 adds settings.
 
-## Phase 3: Search (1-2 days)
+## Phase 3: Search (done)
 - Full-text search with highlighted matches and result snippets.
 - Filters by testament or book.
 - **Done when:** search returns results in well under 100 ms.
+- **Result:** the Search panel (`Ctrl+F` or the top-bar button) searches as you type, with stemming ("love" also finds "loved"), exact phrases in quotes, filters for the whole Bible, either testament or one book, highlighted matches, a total count, "Show more" paging, and Enter or click to jump to the verse. The Go-to panel offers a "Search for" row for anything typed, and the last query and filters are remembered. Release-build timing: 42 ms for the worst case ("the", 27k matches), under 10 ms for everything else (`cargo test --release`).
 
 ## Phase 4: Personalization (2-3 days)
 - Verse selection, then highlight colors, notes and bookmarks.
@@ -42,7 +43,7 @@
 
 ## Phase 5: Depth features (3-5 days)
 - Reading plans with progress tracking.
-- Cross-references and a copy or share verse card.
+- Cross-references (needs a separate public-domain data source) and a copy or share verse card.
 - Optional: audio, or Strong's and lexicon data.
 
 ## Phase 6: Polish and ship (2-3 days)

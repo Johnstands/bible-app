@@ -77,6 +77,21 @@ button {
   color: var(--accent);
 }
 
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 1.4rem;
+}
+
+.topbar-button {
+  color: var(--ink-muted);
+  transition: color var(--dur-fast) var(--ease);
+}
+
+.topbar-button:hover {
+  color: var(--accent);
+}
+
 .translation {
   color: var(--ink-muted);
   letter-spacing: 0.08em;
@@ -437,4 +452,118 @@ button {
   letter-spacing: 0.02em;
   color: var(--ink-muted);
   border-top: 1px solid var(--rule);
+}
+
+/* ---- Search ---- */
+
+.goto.search {
+  width: min(46rem, 100%);
+  height: min(42rem, 80vh);
+}
+
+.search-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 1.2rem;
+  padding: 0.55rem 1.5rem;
+  border-bottom: 1px solid var(--rule);
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+}
+
+.search-filters button,
+.select-wrap {
+  position: relative;
+  margin-left: auto;
+}
+
+/* A quiet chevron replaces the platform's dropdown chrome. */
+.select-wrap::after {
+  content: "";
+  position: absolute;
+  right: 0.15rem;
+  top: 50%;
+  width: 0.4rem;
+  height: 0.4rem;
+  border: solid var(--ink-muted);
+  border-width: 0 1.5px 1.5px 0;
+  transform: translateY(-75%) rotate(45deg);
+  pointer-events: none;
+}
+
+.search-filters select {
+  max-width: 11rem;
+  padding: 0.2rem 1.3rem 0.2rem 0;
+  font: inherit;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: 0;
+  border-bottom: 1.5px solid transparent;
+  border-radius: 0;
+  cursor: pointer;
+}
+
+.search-filters option,
+.search-filters optgroup {
+  color: var(--ink);
+  background: var(--bg);
+}
+
+.search-results {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0.35rem 0;
+}
+
+.hit {
+  display: block;
+  width: 100%;
+  padding: 0.5rem 1.5rem 0.6rem;
+  text-align: left;
+  border-left: 2px solid transparent;
+}
+
+.hit[aria-selected="true"] {
+  border-left-color: var(--accent);
+  background: color-mix(in srgb, var(--gold) 9%, transparent);
+}
+
+.hit-ref {
+  display: block;
+  margin-bottom: 0.1rem;
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+}
+
+.hit-text {
+  display: block;
+  font-family: var(--font-scripture);
+  font-size: 1.1rem;
+  line-height: 1.45;
+}
+
+mark {
+  padding: 0 0.06em;
+  color: inherit;
+  background: color-mix(in srgb, var(--gold) 36%, transparent);
+  border-radius: 2px;
+}
+
+.hit-more {
+  display: block;
+  width: 100%;
+  padding: 0.8rem;
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  color: var(--ink-muted);
+}
+
+.hit-more:hover {
+  color: var(--accent);
 }

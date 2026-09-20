@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import "./App.css";
 import { getChapter, listBooks } from "./api";
 import type { Book, Verse } from "./api";
@@ -7,6 +7,8 @@ import type { Neighbor, Target } from "./Chapter";
 import { GoTo } from "./GoTo";
 import type { Destination } from "./GoTo";
 import { adjacent, chapterTitle } from "./nav";
+import { EMPTY_SEARCH, Search } from "./Search";
+import type { SearchMemory } from "./Search";
 import type { Position } from "./nav";
 import { loadJson, saveJson } from "./storage";
 
@@ -73,6 +75,8 @@ function App() {
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [target, setTarget] = useState<Target | null>(null);
   const [gotoOpen, setGotoOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchMemory = useRef<SearchMemory>(EMPTY_SEARCH);
   const [error, setError] = useState<string | null>(null);
   const [theme, setTheme] = useState<Theme>(loadTheme);
   const jumpId = useRef(0);
@@ -145,7 +149,22 @@ function App() {
     setPos((p) => (p.book === book && p.chapter === chapter ? p : { book, chapter }));
     if (!verse && pos.book === book && pos.chapter === chapter) window.scrollTo(0, 0);
     setGotoOpen(false);
+    setSearchOpen(false);
   };
+
+  // Go to and Search share the screen, so opening one closes the other.
+  const openGoto = () => {
+    setSearchOpen(false);
+    setGotoOpen(true);
+  };
+  const openSearch = (seed?: string) => {
+    if (seed) searchMemory.current = { ...searchMemory.current, query: seed };
+    setGotoOpen(false);
+    setSearchOpen(true);
+  };
+  const remember = useCallback((m: SearchMemory) => {
+    searchMemory.current = m;
+  }, []);
 
   const book = books.find((b) => b.id === pos.book);
   const shown = loaded && books.find((b) => b.id === loaded.book);
@@ -167,14 +186,19 @@ function App() {
     onKeyRef.current = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        setGotoOpen(true);
+        openGoto();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f") {
+        e.preventDefault();
+        if (!searchOpen) openSearch();
         return;
       }
       const typing = e.target instanceof HTMLElement && (e.target.tagName === "INPUT" || e.target.isContentEditable);
-      if (e.ctrlKey || e.metaKey || e.altKey || typing || gotoOpen) return;
+      if (e.ctrlKey || e.metaKey || e.altKey || typing || gotoOpen || searchOpen) return;
       if (e.key === "/") {
         e.preventDefault();
-        setGotoOpen(true);
+        openGoto();
       } else if (e.key === "ArrowLeft" && prev) navigate({ ...prev.pos });
       else if (e.key === "ArrowRight" && next) navigate({ ...next.pos });
       // Temporary: lets the three themes be compared until Phase 4 adds settings.
@@ -189,13 +213,18 @@ function App() {
 
   return (
     <>
-      <header className={`topbar${idle && !gotoOpen ? " is-idle" : ""}`}>
-        <button className="location" onClick={() => setGotoOpen(true)} title="Go to… (Ctrl+K or /)">
+      <header className={`topbar${idle && !gotoOpen && !searchOpen ? " is-idle" : ""}`}>
+        <button className="location" onClick={openGoto} title="Go to… (Ctrl+K or /)">
           {book ? label(pos) : ""}
         </button>
-        <span className="translation" title="King James Version">
-          {TRANSLATION}
-        </span>
+        <div className="topbar-right">
+          <button className="topbar-button" onClick={() => openSearch()} title="Search (Ctrl+F)">
+            Search
+          </button>
+          <span className="translation" title="King James Version">
+            {TRANSLATION}
+          </span>
+        </div>
       </header>
 
       <main className="page">
@@ -216,7 +245,22 @@ function App() {
       </main>
 
       {gotoOpen && books.length > 0 && (
-        <GoTo books={books} current={pos} onGo={navigate} onClose={() => setGotoOpen(false)} />
+        <GoTo
+          books={books}
+          current={pos}
+          onGo={navigate}
+          onSearch={openSearch}
+          onClose={() => setGotoOpen(false)}
+        />
+      )}
+      {searchOpen && books.length > 0 && (
+        <Search
+          books={books}
+          initial={searchMemory.current}
+          onRemember={remember}
+          onGo={navigate}
+          onClose={() => setSearchOpen(false)}
+        />
       )}
     </>
   );

@@ -60,6 +60,10 @@ pub struct Verse {
     pub subscription: Option<String>,
 }
 
+/// Characters wrapped around matched words in `SearchHit::snippet`; the UI turns them into highlights.
+pub const MATCH_START: char = '\u{1}';
+pub const MATCH_END: char = '\u{2}';
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SearchHit {
@@ -68,7 +72,25 @@ pub struct SearchHit {
     pub book_name: String,
     pub chapter: u32,
     pub verse: u32,
-    pub text: String,
+    /// The verse text (shortened around the match for long verses) with matched words
+    /// wrapped in `MATCH_START` / `MATCH_END`.
+    pub snippet: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SearchResults {
+    /// How many verses match in all, ignoring `limit` and `offset`.
+    pub total: u32,
+    pub hits: Vec<SearchHit>,
+}
+
+/// Narrows a search. All fields are optional and combine with AND.
+#[derive(Debug, Default)]
+pub struct SearchFilter<'a> {
+    pub translation: Option<&'a str>,
+    /// `OT` or `NT`.
+    pub testament: Option<&'a str>,
+    pub book: Option<u32>,
 }
 
 /// Opens the bundled Bible DB read-only.
@@ -178,50 +200,86 @@ pub fn get_chapter(
     Ok(rows.collect::<rusqlite::Result<_>>()?)
 }
 
-/// Turns free text into a safe FTS5 query: every word is quoted (so FTS syntax
-/// characters typed by the user are inert) and the last word matches as a prefix.
-/// Returns `None` if the input has no searchable words.
-fn fts_query(input: &str) -> Option<String> {
-    let words: Vec<&str> = input
-        .split(|c: char| !c.is_alphanumeric())
-        .filter(|w| !w.is_empty())
-        .collect();
-    let (last, rest) = words.split_last()?;
-    let mut q: Vec<String> = rest.iter().map(|w| format!("\"{w}\"")).collect();
-    q.push(format!("\"{last}\"*"));
-    Some(q.join(" "))
+enum Term<'a> {
+    Word(&'a str),
+    Phrase(String),
 }
 
-/// Full-text search, best matches first. `translation = None` searches all translations.
+/// Turns free text into a safe FTS5 query. Every word is quoted, so FTS syntax characters
+/// typed by the user are inert; words in double quotes become an exact phrase; and a trailing
+/// bare word matches as a prefix, so results appear while it is still being typed.
+/// Returns `None` if the input has no searchable words.
+fn fts_query(input: &str) -> Option<String> {
+    let mut terms = Vec::new();
+    // Splitting on `"` puts quoted text at the odd positions; an unclosed quote runs to the end.
+    for (i, segment) in input.split('"').enumerate() {
+        let words = segment.split(|c: char| !c.is_alphanumeric()).filter(|w| !w.is_empty());
+        if i % 2 == 1 {
+            let phrase = words.collect::<Vec<_>>().join(" ");
+            if !phrase.is_empty() {
+                terms.push(Term::Phrase(phrase));
+            }
+        } else {
+            terms.extend(words.map(Term::Word));
+        }
+    }
+    let last = terms.len().checked_sub(1)?;
+    let parts: Vec<String> = terms
+        .iter()
+        .enumerate()
+        .map(|(i, t)| match t {
+            Term::Word(w) if i == last => format!("\"{w}\"*"),
+            Term::Word(w) => format!("\"{w}\""),
+            Term::Phrase(p) => format!("\"{p}\""),
+        })
+        .collect();
+    Some(parts.join(" "))
+}
+
+const SEARCH_FROM_WHERE: &str = "
+    FROM verses_fts
+    JOIN verses v ON v.id = verses_fts.rowid
+    JOIN books b ON b.id = v.book
+    WHERE verses_fts MATCH ?1
+      AND (?2 IS NULL OR v.translation = ?2)
+      AND (?3 IS NULL OR b.testament = ?3)
+      AND (?4 IS NULL OR v.book = ?4)";
+
+/// Full-text search, best matches first, with the total number of matches for paging.
 pub fn search(
     conn: &Connection,
     query: &str,
-    translation: Option<&str>,
+    filter: &SearchFilter,
     limit: u32,
-) -> Result<Vec<SearchHit>> {
+    offset: u32,
+) -> Result<SearchResults> {
     let Some(q) = fts_query(query) else {
-        return Ok(Vec::new());
+        return Ok(SearchResults { total: 0, hits: Vec::new() });
     };
-    let mut stmt = conn.prepare_cached(
-        "SELECT v.translation, v.book, b.name, v.chapter, v.verse, v.text
-         FROM verses_fts
-         JOIN verses v ON v.id = verses_fts.rowid
-         JOIN books b ON b.id = v.book
-         WHERE verses_fts MATCH ?1 AND (?2 IS NULL OR v.translation = ?2)
+    let filters = params![q, filter.translation, filter.testament, filter.book];
+
+    let total = conn
+        .prepare_cached(&format!("SELECT COUNT(*) {SEARCH_FROM_WHERE}"))?
+        .query_row(filters, |r| r.get(0))?;
+
+    let mut stmt = conn.prepare_cached(&format!(
+        "SELECT v.translation, v.book, b.name, v.chapter, v.verse,
+                snippet(verses_fts, 0, char(1), char(2), '…', 32)
+         {SEARCH_FROM_WHERE}
          ORDER BY verses_fts.rank
-         LIMIT ?3",
-    )?;
-    let rows = stmt.query_map(params![q, translation, limit], |r| {
+         LIMIT ?5 OFFSET ?6"
+    ))?;
+    let rows = stmt.query_map(params![q, filter.translation, filter.testament, filter.book, limit, offset], |r| {
         Ok(SearchHit {
             translation: r.get(0)?,
             book: r.get(1)?,
             book_name: r.get(2)?,
             chapter: r.get(3)?,
             verse: r.get(4)?,
-            text: r.get(5)?,
+            snippet: r.get(5)?,
         })
     })?;
-    Ok(rows.collect::<rusqlite::Result<_>>()?)
+    Ok(SearchResults { total, hits: rows.collect::<rusqlite::Result<_>>()? })
 }
 
 #[cfg(test)]
@@ -238,6 +296,15 @@ mod tests {
     fn fts_query_quotes_words_and_prefixes_the_last() {
         assert_eq!(fts_query("love thy neigh").unwrap(), r#""love" "thy" "neigh"*"#);
         assert_eq!(fts_query("  shepherd ").unwrap(), r#""shepherd"*"#);
+    }
+
+    #[test]
+    fn fts_query_keeps_quoted_words_together() {
+        assert_eq!(fts_query(r#""in the beginning""#).unwrap(), r#""in the beginning""#);
+        // Only a trailing bare word is a prefix; a closing phrase is left exact.
+        assert_eq!(fts_query(r#"god "in the beginning" cre"#).unwrap(), r#""god" "in the beginning" "cre"*"#);
+        assert_eq!(fts_query(r#""unclosed phrase"#).unwrap(), r#""unclosed phrase""#);
+        assert_eq!(fts_query(r#""!!!" word"#).unwrap(), r#""word"*"#);
     }
 
     #[test]
@@ -306,25 +373,117 @@ mod tests {
         assert!(get_chapter(&conn, "KJV", 46, 1).unwrap()[0].heading.is_none());
     }
 
+    fn hits(conn: &Connection, q: &str, filter: &SearchFilter, limit: u32) -> SearchResults {
+        search(conn, q, filter, limit, 0).unwrap_or_else(|e| panic!("query {q:?} failed: {e}"))
+    }
+
+    fn reference(h: &SearchHit) -> (&str, u32, u32) {
+        (h.book_name.as_str(), h.chapter, h.verse)
+    }
+
+    /// Removes the highlight markers, leaving the plain text.
+    fn plain(snippet: &str) -> String {
+        snippet.replace([MATCH_START, MATCH_END], "")
+    }
+
     #[test]
     fn search_finds_verses_and_respects_translation_filter() {
         let conn = bible();
-        let hits = search(&conn, "The LORD is my shepherd", Some("KJV"), 10).unwrap();
-        assert_eq!((hits[0].book_name.as_str(), hits[0].chapter, hits[0].verse), ("Psalms", 23, 1));
-        assert!(hits.iter().all(|h| h.translation == "KJV"));
+        let kjv = SearchFilter { translation: Some("KJV"), ..Default::default() };
+        let r = hits(&conn, "The LORD is my shepherd", &kjv, 10);
+        assert_eq!(reference(&r.hits[0]), ("Psalms", 23, 1));
+        assert!(r.hits.iter().all(|h| h.translation == "KJV"));
 
-        assert!(search(&conn, "shepherd", Some("NOPE"), 10).unwrap().is_empty());
+        let none = SearchFilter { translation: Some("NOPE"), ..Default::default() };
+        assert_eq!(hits(&conn, "shepherd", &none, 10).total, 0);
 
         // Stemming and prefix matching: "loving kind" finds "lovingkindness".
-        assert!(!search(&conn, "loving kind", Some("KJV"), 5).unwrap().is_empty());
-        assert_eq!(search(&conn, "shepherd", None, 3).unwrap().len(), 3);
+        assert!(hits(&conn, "loving kind", &kjv, 5).total > 0);
+        assert_eq!(hits(&conn, "shepherd", &SearchFilter::default(), 3).hits.len(), 3);
+    }
+
+    #[test]
+    fn quoted_words_match_as_an_exact_phrase() {
+        let conn = bible();
+        let all = SearchFilter::default();
+        let phrase = hits(&conn, "\"in the beginning\"", &all, 50);
+        let loose = hits(&conn, "in the beginning", &all, 50);
+        assert!(phrase.total > 0 && phrase.total < loose.total);
+        assert!(phrase.hits.iter().all(|h| plain(&h.snippet).to_lowercase().contains("in the beginning")));
+        assert_eq!(reference(&hits(&conn, "\"in the beginning god created\"", &all, 5).hits[0]), ("Genesis", 1, 1));
+    }
+
+    #[test]
+    fn snippets_wrap_matched_words_in_markers() {
+        let conn = bible();
+        let r = hits(&conn, "shepherd", &SearchFilter::default(), 20);
+        for h in &r.hits {
+            assert_eq!(h.snippet.matches(MATCH_START).count(), h.snippet.matches(MATCH_END).count());
+            assert!(h.snippet.contains(MATCH_START), "no match marked in {:?}", h.snippet);
+        }
+        // Stemming: the query "love" also marks "loved", "loveth" and so on.
+        let love = hits(&conn, "love", &SearchFilter::default(), 200);
+        assert!(love.hits.iter().any(|h| h.snippet.to_lowercase().contains("\u{1}loved\u{2}")));
+    }
+
+    #[test]
+    fn filters_narrow_by_testament_and_book() {
+        let conn = bible();
+        let count = |f: SearchFilter| hits(&conn, "shepherd", &f, 500);
+        let all = count(SearchFilter::default());
+        let ot = count(SearchFilter { testament: Some("OT"), ..Default::default() });
+        let nt = count(SearchFilter { testament: Some("NT"), ..Default::default() });
+        assert!(ot.total > 0 && nt.total > 0);
+        assert_eq!(ot.total + nt.total, all.total);
+        assert!(nt.hits.iter().all(|h| h.book >= 40));
+        assert!(ot.hits.iter().all(|h| h.book < 40));
+
+        let psalms = count(SearchFilter { book: Some(19), ..Default::default() });
+        assert!(psalms.total > 0 && psalms.hits.iter().all(|h| h.book == 19));
+        // A book outside the chosen testament matches nothing.
+        assert_eq!(count(SearchFilter { testament: Some("NT"), book: Some(19), ..Default::default() }).total, 0);
+    }
+
+    #[test]
+    fn paging_returns_disjoint_pages_and_a_stable_total() {
+        let conn = bible();
+        let all = SearchFilter::default();
+        let first = search(&conn, "lord", &all, 20, 0).unwrap();
+        let second = search(&conn, "lord", &all, 20, 20).unwrap();
+        assert_eq!(first.total, second.total);
+        assert!(first.total > 40);
+        let key = |h: &SearchHit| (h.book, h.chapter, h.verse);
+        assert!(first.hits.iter().all(|a| second.hits.iter().all(|b| key(a) != key(b))));
+        assert!(search(&conn, "lord", &all, 20, first.total).unwrap().hits.is_empty());
     }
 
     #[test]
     fn search_never_errors_on_odd_input() {
         let conn = bible();
-        for q in ["", "   ", "\"", "AND OR NOT", "NEAR(", "a -b", "col:on", "*", "'; DROP TABLE verses;--"] {
-            search(&conn, q, None, 5).unwrap_or_else(|e| panic!("query {q:?} failed: {e}"));
+        for q in ["", "   ", "\"", "\"\"", "\"unclosed phrase", "AND OR NOT", "NEAR(", "a -b", "col:on", "*", "'; DROP TABLE verses;--"] {
+            hits(&conn, q, &SearchFilter::default(), 5);
+        }
+    }
+
+    // The plan's bar for Phase 3 is 100 ms. Ranking dominates and scales with the number of matches
+    // ("the" matches 27k verses), and an unoptimized test build runs about 4x slower than the shipped
+    // one, so debug builds get a looser bound; `cargo test --release` enforces the real one.
+    #[test]
+    fn search_is_fast() {
+        let conn = bible();
+        let all = SearchFilter::default();
+        let nt = SearchFilter { testament: Some("NT"), ..Default::default() };
+        for (q, f) in [
+            ("the", &all), ("lord", &all), ("and the lord said unto", &all), ("love thy neighbour", &all),
+            ("\"in the beginning\"", &all), ("shep", &all), ("jesus", &nt), ("z", &all),
+        ] {
+            search(&conn, q, f, 50, 0).unwrap(); // warm the statement cache and page cache
+            let start = std::time::Instant::now();
+            let r = search(&conn, q, f, 50, 0).unwrap();
+            let elapsed = start.elapsed();
+            eprintln!("{q:?}: {} matches in {elapsed:?}", r.total);
+            let limit_ms = if cfg!(debug_assertions) { 400 } else { 100 };
+            assert!(elapsed.as_millis() < limit_ms, "{q:?} took {elapsed:?} (limit {limit_ms} ms)");
         }
     }
 

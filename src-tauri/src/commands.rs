@@ -1,4 +1,4 @@
-use crate::db::{self, Book, Result, SearchHit, Translation, Verse};
+use crate::db::{self, Book, Result, SearchFilter, SearchResults, Translation, Verse};
 use crate::AppState;
 use tauri::State;
 
@@ -30,8 +30,16 @@ pub fn search(
     state: State<AppState>,
     query: String,
     translation: Option<String>,
+    testament: Option<String>,
+    book: Option<u32>,
     limit: Option<u32>,
-) -> Result<Vec<SearchHit>> {
+    offset: Option<u32>,
+) -> Result<SearchResults> {
     let limit = limit.unwrap_or(DEFAULT_SEARCH_LIMIT).min(MAX_SEARCH_LIMIT);
-    db::search(&state.bible.lock().unwrap(), &query, translation.as_deref(), limit)
+    let filter = SearchFilter {
+        translation: translation.as_deref(),
+        testament: testament.as_deref(),
+        book,
+    };
+    db::search(&state.bible.lock().unwrap(), &query, &filter, limit, offset.unwrap_or(0))
 }

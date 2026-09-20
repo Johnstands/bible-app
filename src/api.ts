@@ -38,12 +38,25 @@ export interface SearchHit {
   bookName: string;
   chapter: number;
   verse: number;
-  text: string;
+  /** The verse text, shortened around the match if long, with matched words between \u0001 and \u0002. */
+  snippet: string;
+}
+
+export interface SearchResults {
+  /** How many verses match in all, however many `hits` came back. */
+  total: number;
+  hits: SearchHit[];
+}
+
+/** Narrows a search to one testament or one book; both null searches the whole Bible. */
+export interface SearchScope {
+  testament: "OT" | "NT" | null;
+  book: number | null;
 }
 
 export const listTranslations = () => invoke<Translation[]>("list_translations");
 export const listBooks = () => invoke<Book[]>("list_books");
 export const getChapter = (translation: string, book: number, chapter: number) =>
   invoke<Verse[]>("get_chapter", { translation, book, chapter });
-export const search = (query: string, translation?: string, limit?: number) =>
-  invoke<SearchHit[]>("search", { query, translation, limit });
+export const search = (query: string, scope: SearchScope, limit: number, offset: number) =>
+  invoke<SearchResults>("search", { query, testament: scope.testament, book: scope.book, limit, offset });

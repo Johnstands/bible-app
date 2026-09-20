@@ -19,6 +19,8 @@ go in a separate `user.db` in the app data directory.
 
 Tests: `npm test` (reference parser) and `cargo test` in `src-tauri/` (needs `bible.db` to exist).
 
-Keys: `/` or `Ctrl+K` opens Go to (try `jn 3:16`), `←` `→` change chapter, `t` cycles themes.
+Keys: `/` or `Ctrl+K` opens Go to (try `jn 3:16`), `Ctrl+F` searches (quotes match an exact phrase), `←` `→` change chapter, `t` cycles themes.
+
+Search speed is enforced by `cargo test --release` (100 ms); the plain `cargo test` uses a looser bound because unoptimized builds are about 4x slower.
 
 See [docs/PLAN.md](docs/PLAN.md) for the roadmap.
