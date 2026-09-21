@@ -31,6 +31,7 @@ const ftsQuery = (q) => {
 };
 
 export function createBackend({ update = null } = {}) {
+  const plans = new Map(); // started reading plans: id -> { plan, startedOn, done: Map(day -> date) }
   const marks = { highlights: new Map(), notes: [], bookmarks: new Set(), nextId: 1 };
   const key = (b, c, v) => `${b}:${c}:${v}`;
   const parse = (k) => k.split(":").map(Number);
@@ -52,6 +53,18 @@ export function createBackend({ update = null } = {}) {
           verse: r.verse, verseEnd: r.verse_end, text: r.text, kind: r.kind, newBlock: bool(r.new_block), gap: bool(r.gap),
           heading: r.heading, headingKind: r.heading_kind, subscription: r.subscription,
         })),
+    list_chapters: ({ translation }) =>
+      db.prepare(`SELECT book, chapter, MAX(COALESCE(verse_end, verse)) AS verses FROM verses WHERE translation = ?
+        GROUP BY book, chapter ORDER BY book, chapter`).all(translation),
+    get_plans: () => [...plans.values()].sort((a, b) => a.startedOn.localeCompare(b.startedOn) || a.plan.localeCompare(b.plan))
+      .map((p) => ({ plan: p.plan, startedOn: p.startedOn, done: [...p.done].sort((x, y) => x[0] - y[0]).map(([day, doneOn]) => ({ day, doneOn })) })),
+    start_plan: ({ plan, startedOn }) => { if (!plans.has(plan)) plans.set(plan, { plan, startedOn, done: new Map() }); },
+    stop_plan: ({ plan }) => { plans.delete(plan); },
+    set_plan_day: ({ plan, day, done, doneOn }) => {
+      const p = plans.get(plan);
+      if (!p) throw "plan has not been started";
+      if (done) { if (!p.done.has(day)) p.done.set(day, doneOn); } else p.done.delete(day);
+    },
     // The real command saves into Pictures; here the card goes to a temp folder so the test can read it back.
     save_image: ({ fileName, bytes }) => {
       const dir = path.join(os.tmpdir(), "kjv-ui-test-cards");

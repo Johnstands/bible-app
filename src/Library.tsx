@@ -5,6 +5,7 @@ import { formatDate } from "./dates";
 import type { Destination } from "./GoTo";
 import { chapterTitle } from "./nav";
 import { referenceLabel } from "./verses";
+import { useKeepFocus } from "./useKeepFocus";
 import { useReturnFocus } from "./useReturnFocus";
 
 type Tab = "bookmarks" | "notes" | "highlights";
@@ -38,9 +39,9 @@ export function Library({ books, onGo, onClose }: Props) {
       .catch((e) => setError(String(e)));
 
   useReturnFocus();
+  useKeepFocus(panelRef);
 
   useEffect(() => {
-    panelRef.current?.focus();
     void load();
   }, []);
 

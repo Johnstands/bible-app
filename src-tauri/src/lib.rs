@@ -2,6 +2,7 @@ mod cards;
 mod commands;
 mod crossrefs;
 mod db;
+mod plans;
 mod strongs;
 mod syslibs;
 mod user;
@@ -46,6 +47,11 @@ pub fn run() {
             commands::get_strongs,
             commands::get_cross_refs,
             commands::save_image,
+            commands::list_chapters,
+            commands::get_plans,
+            commands::start_plan,
+            commands::stop_plan,
+            commands::set_plan_day,
             commands::get_marks,
             commands::set_highlight,
             commands::save_note,

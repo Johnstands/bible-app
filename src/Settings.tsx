@@ -19,6 +19,7 @@ const SHORTCUTS: [string[], string][] = [
   [["B", "N", "C"], "Bookmark, add a note, or copy the selection"],
   [["1", "2", "3", "4", "5"], "Highlight the selection in a color"],
   [["W", "Shift+W"], "Open the next or previous word's meaning"],
+  [["P"], "Reading plans"],
   [["I"], "Make a picture of the selected verses to share"],
   [["X"], "Cross-references for the selected verse (or the one the cursor is on)"],
   [["S"], "Turn original-language words (Hebrew and Greek) on or off"],

@@ -110,6 +110,28 @@ export interface CrossRef {
 /** Passages related to a verse, most useful first, with their text. */
 export const getCrossRefs = (translation: string, book: number, chapter: number, verse: number) =>
   invoke<CrossRef[]>("get_cross_refs", { translation, book, chapter, verse });
+/** A chapter's length, for planning reading by verses rather than by chapters. */
+export interface ChapterSize {
+  book: number;
+  chapter: number;
+  verses: number;
+}
+
+/** A reading plan the reader has started, with the days finished so far (dates are local, `YYYY-MM-DD`). */
+export interface StartedPlan {
+  plan: string;
+  startedOn: string;
+  done: { day: number; doneOn: string }[];
+}
+
+export const listChapters = (translation: string) => invoke<ChapterSize[]>("list_chapters", { translation });
+export const getPlans = () => invoke<StartedPlan[]>("get_plans");
+export const startPlan = (plan: string, startedOn: string) => invoke<void>("start_plan", { plan, startedOn });
+/** Stops a plan and forgets its progress. */
+export const stopPlan = (plan: string) => invoke<void>("stop_plan", { plan });
+export const setPlanDay = (plan: string, day: number, done: boolean, doneOn: string) =>
+  invoke<void>("set_plan_day", { plan, day, done, doneOn });
+
 /** Saves a PNG (a verse card) in the Pictures folder and returns the path it was saved to. */
 export const saveImage = (fileName: string, bytes: number[]) => invoke<string>("save_image", { fileName, bytes });
 export const getStrongs = (num: string) => invoke<StrongsEntry | null>("get_strongs", { num });

@@ -60,6 +60,24 @@ describe("focus around dialogs", () => {
   });
 });
 
+describe("focus stays in a dialog", () => {
+  it("the Library still closes with Escape after a row it held focus in is removed", async () => {
+    app = await startApp();
+    await app.page.click('[data-verse="16"]');
+    await app.page.keyboard.press("b");
+    await app.page.waitForSelector('[data-verse="16"] .mk-bookmark');
+    await app.page.keyboard.press("Escape");
+    await app.page.keyboard.press("Control+l");
+    await app.page.waitForSelector(".lib-row");
+    await app.page.locator(".lib-remove").first().focus();
+    await app.page.keyboard.press("Enter");
+    await app.page.waitForFunction(() => document.querySelectorAll(".lib-row").length === 0);
+    expect(await app.page.evaluate(() => document.activeElement?.closest(".library") !== null)).toBe(true);
+    await app.page.keyboard.press("Escape");
+    await app.page.waitForSelector(".library", { state: "detached" });
+  });
+});
+
 describe("lists in the dialogs", () => {
   it("tells assistive technology which search result is current", async () => {
     app = await startApp();

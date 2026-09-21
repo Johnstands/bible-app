@@ -49,6 +49,8 @@ Settings also has **Original-language words** (off by default; press S to switch
 
 Select a verse and choose **Cross-references** (or press X) to see the passages related to it, best first; choose one to read it.
 
+Press **P** (or choose **Plans**) for reading plans: the Bible in a year, the New Testament in 90 days, the Gospels in a month, and Psalms and Proverbs in a month. Each day's reading is worked out from the chapters, balanced by length (`src/plans.ts`), so a plan can be improved without touching anyone's progress, which is stored in `user.db` as plan ids and day numbers. There are no dates to keep up with: mark a day done from the panel, or from the strip under a chapter that belongs to it, and the next reading is the first day not done. A streak counts days in a row on which anything was finished.
+
 Select verses and choose **Share** (or press I) to make a picture of them: a card in the reader's typeface and colors, in a square, portrait or wide shape. **Save image** puts a PNG in `Pictures/Bible verse cards/`; **Copy image** puts it on the clipboard. `src/verseCard.ts` draws it; text too long for a card is refused rather than shrunk to nothing.
 
 ## Building and releasing

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
-import { EMPTY_MARKS, getChapter, getMarks, getWordTags, HIGHLIGHT_COLORS, listBooks, saveNote, setHighlight, toggleBookmark } from "./api";
-import type { Book, ChapterMarks, HighlightColor, Verse, WordTag } from "./api";
+import { EMPTY_MARKS, getChapter, getMarks, getPlans, getWordTags, HIGHLIGHT_COLORS, listBooks, listChapters, saveNote, setHighlight, setPlanDay, startPlan, stopPlan, toggleBookmark } from "./api";
+import type { Book, ChapterMarks, HighlightColor, StartedPlan, Verse, WordTag } from "./api";
 import glossaryText from "../data/glossary.txt?raw";
 import { TRANSLATION, TRANSLATION_NAME } from "./config";
 import { Chapter } from "./Chapter";
@@ -12,6 +12,9 @@ import type { Destination } from "./GoTo";
 import { CrossReferences } from "./CrossReferences";
 import type { RefSource } from "./CrossReferences";
 import { Library } from "./Library";
+import { buildPlans, dayLabel, localDate, nextDay } from "./plans";
+import type { Plan } from "./plans";
+import { ReadingPlans } from "./ReadingPlans";
 import { ShareCard } from "./ShareCard";
 import { adjacent, chapterTitle } from "./nav";
 import type { Position } from "./nav";
@@ -49,7 +52,7 @@ function keepInView(el: Element | null) {
 }
 
 /** The full-screen panels. Only one is open at a time. */
-type Panel = "goto" | "search" | "settings" | "library" | "votd" | "refs" | "share";
+type Panel = "goto" | "search" | "settings" | "library" | "votd" | "refs" | "share" | "plans";
 const DEFAULT_POSITION: Position = { book: 1, chapter: 1 };
 
 interface SavedPosition extends Position {
@@ -116,6 +119,8 @@ function App() {
   const [selected, setSelected] = useState<ReadonlySet<number>>(new Set());
   const anchor = useRef<number | null>(null); // where a shift-click range starts
   const [note, setNote] = useState<NoteDraft | null>(null);
+  const [planDefs, setPlanDefs] = useState<Plan[]>([]);
+  const [startedPlans, setStartedPlans] = useState<StartedPlan[]>([]);
   const [shareFor, setShareFor] = useState<{ reference: string; text: string } | null>(null);
   const [refsFor, setRefsFor] = useState<(RefSource & { label: string; text: string }) | null>(null);
   const [copied, setCopied] = useState(false);
@@ -207,6 +212,26 @@ function App() {
     setHelp(null);
     setCursor(null);
   }, [loaded?.book, loaded?.chapter]);
+
+  // Reading plans: what each day reads comes from the chapter lengths; progress lives in the user DB. Neither
+  // is worth stopping the reader for if it can't be loaded.
+  useEffect(() => {
+    listChapters(TRANSLATION).then((sizes) => setPlanDefs(buildPlans(sizes))).catch((e) => console.error(e));
+    getPlans().then(setStartedPlans).catch((e) => console.error(e));
+  }, []);
+  const refreshPlans = () => getPlans().then(setStartedPlans).catch((e) => setError(String(e)));
+  const beginPlan = (id: string) => startPlan(id, localDate()).then(refreshPlans).catch((e) => setError(String(e)));
+  const endPlan = (id: string) => stopPlan(id).then(refreshPlans).catch((e) => setError(String(e)));
+  const restartPlan = (id: string) =>
+    stopPlan(id).then(() => startPlan(id, localDate())).then(refreshPlans).catch((e) => setError(String(e)));
+  const markPlanDay = (id: string, day: number, done: boolean) =>
+    setPlanDay(id, day, done, localDate())
+      .then(refreshPlans)
+      .then(() => {
+        const name = planDefs.find((p) => p.id === id)?.name ?? "the plan";
+        announce(done ? `Day ${day} of ${name} marked done.` : `Day ${day} of ${name} marked not done.`);
+      })
+      .catch((e) => setError(String(e)));
 
   // The glossary needs the book list to resolve its verse references. A bad entry must not take the reader down.
   const glossary = useMemo(() => {
@@ -309,6 +334,7 @@ function App() {
   const openGoto = () => show("goto");
   const openSettings = () => show("settings");
   const openLibrary = () => show("library");
+  const openPlans = () => show("plans");
   const openSearch = (seed?: string) => {
     if (seed) searchMemory.current = { ...searchMemory.current, query: seed };
     show("search");
@@ -373,6 +399,19 @@ function App() {
   const chosen = [...selected].sort((a, b) => a - b);
   const marks = loaded?.marks ?? EMPTY_MARKS;
   const title = shown ? chapterTitle(shown) : "";
+  // Plans under way whose next day includes the chapter on screen, so the day can be ticked off where it is read.
+  const planChips = useMemo(() => {
+    if (!ready || !loaded) return [];
+    return planDefs.flatMap((plan) => {
+      const s = startedPlans.find((x) => x.plan === plan.id);
+      const day = s && nextDay(plan, new Set(s.done.map((d) => d.day)));
+      return day && day.chapters.some((c) => c.book === loaded.book && c.chapter === loaded.chapter) ? [{ plan, day }] : [];
+    });
+  }, [ready, loaded, planDefs, startedPlans]);
+  const bookTitle = (id: number) => {
+    const b = books.find((x) => x.id === id);
+    return b ? chapterTitle(b) : "";
+  };
 
   const refreshMarks = async () => {
     if (!loaded) return;
@@ -572,6 +611,10 @@ function App() {
         searchNumber(openNum);
         return;
       }
+      if (e.key === "p" || e.key === "P") {
+        openPlans();
+        return;
+      }
       if (e.key === "x" || e.key === "X") {
         openRefs();
         return;
@@ -624,6 +667,9 @@ function App() {
             {book ? label(pos) : ""}
           </button>
           <div className="topbar-right">
+            <button className="topbar-button" onClick={openPlans} title="Reading plans (P)">
+              Plans
+            </button>
             <button className="topbar-button" onClick={openLibrary} title={`Library: bookmarks, notes and highlights (${shortcutLabel("L")})`}>
               Library
             </button>
@@ -667,6 +713,36 @@ function App() {
                 onOpenNote={openNote}
                 onWordClick={showWord}
               />
+              {planChips.length > 0 && (
+                <div className="plan-chips">
+                  {planChips.map(({ plan, day }) => (
+                    <div key={plan.id} className="plan-chip" role="group" aria-label={`${plan.name}, day ${day.day}`}>
+                      <div className="plan-chip-text">
+                        <span className="plan-label">
+                          {plan.name} · Day {day.day}
+                        </span>
+                        <span className="plan-chip-chapters" aria-label={dayLabel(day, bookTitle)}>
+                          {day.chapters.map((c) => {
+                            const here = c.book === loaded.book && c.chapter === loaded.chapter;
+                            return (
+                              <button
+                                key={`${c.book}-${c.chapter}`}
+                                aria-current={here ? "page" : undefined}
+                                onClick={() => !here && navigate({ book: c.book, chapter: c.chapter })}
+                              >
+                                {bookTitle(c.book)} {c.chapter}
+                              </button>
+                            );
+                          })}
+                        </span>
+                      </div>
+                      <button className="plan-chip-done" onClick={() => markPlanDay(plan.id, day.day, true)}>
+                        Mark day done
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </main>
@@ -745,6 +821,20 @@ function App() {
         />
       )}
       {panel === "library" && books.length > 0 && <Library books={books} onGo={navigate} onClose={closePanel} />}
+      {panel === "plans" && books.length > 0 && (
+        <ReadingPlans
+          books={books}
+          plans={planDefs}
+          started={startedPlans}
+          today={localDate()}
+          onStart={beginPlan}
+          onStop={endPlan}
+          onRestart={restartPlan}
+          onSetDay={markPlanDay}
+          onGo={navigate}
+          onClose={closePanel}
+        />
+      )}
       {panel === "share" && shareFor && (
         <ShareCard
           reference={shareFor.reference}

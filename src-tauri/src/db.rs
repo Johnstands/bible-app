@@ -144,6 +144,26 @@ pub fn verse_text(
     Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?.join(" "))
 }
 
+/// How long a chapter is, for planning reading by length rather than by chapter count.
+#[derive(Debug, Serialize)]
+pub struct ChapterSize {
+    pub book: u32,
+    pub chapter: u32,
+    pub verses: u32,
+}
+
+/// Every chapter of the Bible in order, with its verse count.
+pub fn list_chapters(conn: &Connection, translation: &str) -> Result<Vec<ChapterSize>> {
+    let mut stmt = conn.prepare_cached(
+        "SELECT book, chapter, MAX(COALESCE(verse_end, verse)) FROM verses
+         WHERE translation = ?1 GROUP BY book, chapter ORDER BY book, chapter",
+    )?;
+    let rows = stmt.query_map(params![translation], |r| {
+        Ok(ChapterSize { book: r.get(0)?, chapter: r.get(1)?, verses: r.get(2)? })
+    })?;
+    Ok(rows.collect::<rusqlite::Result<_>>()?)
+}
+
 pub fn get_chapter(
     conn: &Connection,
     translation: &str,
@@ -301,6 +321,18 @@ mod tests {
         assert_eq!((books[42].name.as_str(), books[42].chapters), ("John", 21));
         let ids: Vec<_> = list_translations(&conn).unwrap().into_iter().map(|t| t.id).collect();
         assert_eq!(ids, ["KJV"]);
+    }
+
+    #[test]
+    fn lists_every_chapter_with_its_length() {
+        let chapters = list_chapters(&bible(), "KJV").unwrap();
+        assert_eq!(chapters.len(), 1189);
+        assert!(chapters.windows(2).all(|w| (w[0].book, w[0].chapter) < (w[1].book, w[1].chapter)));
+        let psalm_119 = chapters.iter().find(|c| (c.book, c.chapter) == (19, 119)).unwrap();
+        assert_eq!(psalm_119.verses, 176);
+        let john_3 = chapters.iter().find(|c| (c.book, c.chapter) == (43, 3)).unwrap();
+        assert_eq!(john_3.verses, 36);
+        assert!(chapters.iter().all(|c| c.verses >= 1));
     }
 
     #[test]

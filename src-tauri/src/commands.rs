@@ -1,4 +1,5 @@
-use crate::db::{self, Book, Result, SearchFilter, SearchResults, Translation, Verse};
+use crate::db::{self, Book, ChapterSize, Result, SearchFilter, SearchResults, Translation, Verse};
+use crate::plans::{self, StartedPlan};
 use crate::user::{self, ChapterMarks, Library, Note};
 use crate::strongs::{self, StrongsEntry, VerseTags};
 use crate::cards;
@@ -38,6 +39,35 @@ pub fn get_word_tags(
     chapter: u32,
 ) -> Result<Vec<VerseTags>> {
     strongs::get_word_tags(&state.bible.lock().unwrap(), &translation, book, chapter)
+}
+
+/// Every chapter with its verse count, which is what reading plans are balanced by.
+#[tauri::command]
+pub fn list_chapters(state: State<AppState>, translation: String) -> Result<Vec<ChapterSize>> {
+    db::list_chapters(&state.bible.lock().unwrap(), &translation)
+}
+
+/// The reading plans the reader has started, with the days they have finished.
+#[tauri::command]
+pub fn get_plans(state: State<AppState>) -> Result<Vec<StartedPlan>> {
+    plans::get_plans(&state.user.lock().unwrap())
+}
+
+#[tauri::command]
+pub fn start_plan(state: State<AppState>, plan: String, started_on: String) -> Result<()> {
+    plans::start_plan(&state.user.lock().unwrap(), &plan, &started_on)
+}
+
+/// Stops a plan and forgets its progress.
+#[tauri::command]
+pub fn stop_plan(state: State<AppState>, plan: String) -> Result<()> {
+    plans::stop_plan(&state.user.lock().unwrap(), &plan)
+}
+
+/// Marks a day of a started plan done or not done.
+#[tauri::command]
+pub fn set_plan_day(state: State<AppState>, plan: String, day: u32, done: bool, done_on: String) -> Result<()> {
+    plans::set_day(&state.user.lock().unwrap(), &plan, day, done, &done_on)
 }
 
 /// Saves a verse card (PNG bytes) into the Pictures folder and returns where it went.
