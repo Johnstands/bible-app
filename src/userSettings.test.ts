@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clampScale, DEFAULT_SETTINGS, sanitizeSettings } from "./settings";
+import { clampScale, DEFAULT_SETTINGS, sanitizeSettings } from "./userSettings";
 
 describe("sanitizeSettings", () => {
   it("returns the defaults for nothing or nonsense", () => {

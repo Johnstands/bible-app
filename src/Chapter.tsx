@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import type { Book, ChapterMarks, HighlightColor, Verse } from "./api";
 import { annotate, verseKey } from "./glossary";
 import type { GlossaryEntry, GlossaryIndex, Segment } from "./glossary";
-import type { WordHelpLevel } from "./settings";
+import type { WordHelpLevel } from "./userSettings";
 import { chapterTitle } from "./nav";
 import type { Position } from "./nav";
 

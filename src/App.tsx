@@ -19,7 +19,7 @@ import { EMPTY_SEARCH, Search } from "./Search";
 import type { SearchMemory } from "./Search";
 import { SelectionBar } from "./SelectionBar";
 import { Settings } from "./Settings";
-import { applySettings, loadSettings, saveSettings } from "./settings";
+import { applySettings, loadSettings, saveSettings } from "./userSettings";
 import { loadJson, saveJson } from "./storage";
 import { quotation, referenceLabel, span } from "./verses";
 import { appVersion, findUpdate } from "./updater";

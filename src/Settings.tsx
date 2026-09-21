@@ -1,8 +1,8 @@
 import { useEffect, useRef } from "react";
 import {
   clampScale, DEFAULT_SETTINGS, FONT_SCALE, FONTS, THEME_LABELS, THEMES, WORD_HELP_LABELS, WORD_HELP_LEVELS,
-} from "./settings";
-import type { FontFamily, Settings as SettingsValue } from "./settings";
+} from "./userSettings";
+import type { FontFamily, Settings as SettingsValue } from "./userSettings";
 import { useReturnFocus } from "./useReturnFocus";
 import { shortcutLabel } from "./platform";
 
