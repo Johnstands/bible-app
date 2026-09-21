@@ -87,10 +87,12 @@ describe("lists in the dialogs", () => {
     await app.page.keyboard.press("Control+l");
     await app.page.waitForSelector(".lib-row");
     await app.page.keyboard.press("ArrowRight"); // Notes tab
-    await app.page.waitForFunction(() =>
-      document.querySelector('[role="tab"][aria-selected="true"]')?.textContent?.includes("Notes"),
+    // The tab switches first and focus follows, so wait for both.
+    await app.page.waitForFunction(
+      () =>
+        document.querySelector('[role="tab"][aria-selected="true"]')?.textContent?.includes("Notes") &&
+        document.activeElement?.getAttribute("role") === "tab",
     );
-    expect(await app.page.evaluate(() => document.activeElement?.getAttribute("role"))).toBe("tab");
     await app.page.keyboard.press("ArrowLeft");
     await app.page.waitForFunction(() => document.activeElement?.textContent?.includes("Bookmarks"));
     await app.page.keyboard.press("ArrowDown");
