@@ -1,4 +1,5 @@
 {
+  "productName": "KJV Readers Bible",
   "bundle": {
     "targets": ["nsis"]
   }
