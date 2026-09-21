@@ -1,3 +1,4 @@
+mod cards;
 mod commands;
 mod crossrefs;
 mod db;
@@ -44,6 +45,7 @@ pub fn run() {
             commands::get_word_tags,
             commands::get_strongs,
             commands::get_cross_refs,
+            commands::save_image,
             commands::get_marks,
             commands::set_highlight,
             commands::save_note,

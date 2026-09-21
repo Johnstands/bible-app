@@ -1,9 +1,10 @@
 use crate::db::{self, Book, Result, SearchFilter, SearchResults, Translation, Verse};
 use crate::user::{self, ChapterMarks, Library, Note};
 use crate::strongs::{self, StrongsEntry, VerseTags};
+use crate::cards;
 use crate::crossrefs::{self, CrossRef};
 use crate::AppState;
-use tauri::State;
+use tauri::{Manager, State};
 
 const DEFAULT_SEARCH_LIMIT: u32 = 50;
 const MAX_SEARCH_LIMIT: u32 = 500;
@@ -37,6 +38,14 @@ pub fn get_word_tags(
     chapter: u32,
 ) -> Result<Vec<VerseTags>> {
     strongs::get_word_tags(&state.bible.lock().unwrap(), &translation, book, chapter)
+}
+
+/// Saves a verse card (PNG bytes) into the Pictures folder and returns where it went.
+#[tauri::command]
+pub fn save_image(app: tauri::AppHandle, file_name: String, bytes: Vec<u8>) -> Result<String> {
+    let base = app.path().picture_dir().or_else(|_| app.path().download_dir())?;
+    let path = cards::save_png(&base.join(cards::FOLDER), &file_name, &bytes)?;
+    Ok(path.to_string_lossy().into_owned())
 }
 
 /// Passages related to a verse, most useful first, each with its text.

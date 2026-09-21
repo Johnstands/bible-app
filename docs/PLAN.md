@@ -69,7 +69,8 @@ Purpose: help a modern reader understand the KJV. Words that are archaic, or tha
 - Reading plans with progress tracking.
 - Cross-references and a copy or share verse card.
 - **Cross-references (done):** OpenBible.info's data (CC BY, mostly the Treasury of Scripture Knowledge) is built into a `cross_refs` table (`scripts/build-bible-db.mjs`); `src-tauri/src/crossrefs.rs` serves a verse's references best first with their text. The selection toolbar's **Cross-references** button, or the X key, opens a panel of them (`src/CrossReferences.tsx`); choosing one jumps there. No setting: they only appear when asked for.
-- The share verse card is still to do.
+- **Share verse card (done):** the selection toolbar's **Share** button, or the I key, opens a dialog with a live preview of the selected verses drawn on a canvas (`src/verseCard.ts`, `src/ShareCard.tsx`) in the reader's typeface: square, portrait or wide, in the paper, sepia or dark colors. **Save image** writes a PNG to `Pictures/Bible verse cards/` (`src-tauri/src/cards.rs`, which also refuses anything that isn't a PNG and never overwrites); **Copy image** uses the clipboard, and says so when a system won't allow it. Text is balanced so no word is stranded on the last line.
+- Still to do: reading plans (audio is skipped).
 - Optional: audio, or Strong's and lexicon data.
 - **Strong's numbers (done):** the KJV source tags about 349,000 phrases with Hebrew or Greek numbers, and Open Scriptures' edition of Strong's dictionaries supplies the entries. A setting ("Original-language words", off by default, or the S key) makes those words clickable: the card shows the original word, Strong's definition, how the KJV renders it, and a link that lists every verse using it (search `H7225` or `G26` works too). `word_tags` and `strongs` tables in `bible.db`; `src-tauri/src/strongs.rs`; `src/wordUnits.ts` merges the tags with word help.
 

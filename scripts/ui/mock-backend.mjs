@@ -1,7 +1,9 @@
 // A stand-in for the Rust commands, so the UI can run in a plain browser (no Tauri window).
 // Reads the real bible.db; marks are kept in memory. Used by scripts/ui/*.mjs for screenshots
 // and UI checks, and only ever answers on localhost.
+import fs from "node:fs";
 import http from "node:http";
+import os from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
@@ -50,6 +52,14 @@ export function createBackend({ update = null } = {}) {
           verse: r.verse, verseEnd: r.verse_end, text: r.text, kind: r.kind, newBlock: bool(r.new_block), gap: bool(r.gap),
           heading: r.heading, headingKind: r.heading_kind, subscription: r.subscription,
         })),
+    // The real command saves into Pictures; here the card goes to a temp folder so the test can read it back.
+    save_image: ({ fileName, bytes }) => {
+      const dir = path.join(os.tmpdir(), "kjv-ui-test-cards");
+      fs.mkdirSync(dir, { recursive: true });
+      const file = path.join(dir, `${Date.now()}-${fileName.replace(/[^\w .-]/g, "")}`);
+      fs.writeFileSync(file, Buffer.from(bytes));
+      return file;
+    },
     get_cross_refs: ({ translation, book, chapter, verse }) => {
       const split = (k) => [Math.floor(k / 1e6), Math.floor(k / 1e3) % 1e3, k % 1e3];
       const text = db.prepare(`SELECT text FROM verses WHERE translation = ? AND book = ? AND (chapter, verse) >= (?, ?)

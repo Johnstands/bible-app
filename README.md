@@ -49,6 +49,8 @@ Settings also has **Original-language words** (off by default; press S to switch
 
 Select a verse and choose **Cross-references** (or press X) to see the passages related to it, best first; choose one to read it.
 
+Select verses and choose **Share** (or press I) to make a picture of them: a card in the reader's typeface and colors, in a square, portrait or wide shape. **Save image** puts a PNG in `Pictures/Bible verse cards/`; **Copy image** puts it on the clipboard. `src/verseCard.ts` draws it; text too long for a card is refused rather than shrunk to nothing.
+
 ## Building and releasing
 
 `npm run tauri build` makes the Linux packages (a `.deb` and an AppImage) in `src-tauri/target/release/bundle/`. Releases, signing and the update mechanism are described in [docs/RELEASING.md](docs/RELEASING.md).

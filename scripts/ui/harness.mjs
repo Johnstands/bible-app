@@ -23,6 +23,8 @@ export async function launch({ width = 1000, height = 820, scheme = "light", mot
   const server = serve(9100, { update });
   const browser = await chromium.launch({ executablePath: CHROMIUM, args: ["--no-sandbox"] });
   const context = await browser.newContext({ viewport: { width, height }, colorScheme: scheme, reducedMotion: motion, deviceScaleFactor: 1.5 });
+  // Copying a picture to the clipboard needs permission in a browser; the desktop app doesn't ask.
+  await context.grantPermissions(["clipboard-read", "clipboard-write"], { origin: new URL(APP_URL).origin });
   await context.addInitScript(bridge);
   const page = await context.newPage();
   const errors = [];

@@ -3,7 +3,7 @@ import "./App.css";
 import { EMPTY_MARKS, getChapter, getMarks, getWordTags, HIGHLIGHT_COLORS, listBooks, saveNote, setHighlight, toggleBookmark } from "./api";
 import type { Book, ChapterMarks, HighlightColor, Verse, WordTag } from "./api";
 import glossaryText from "../data/glossary.txt?raw";
-import { TRANSLATION } from "./config";
+import { TRANSLATION, TRANSLATION_NAME } from "./config";
 import { Chapter } from "./Chapter";
 import type { Neighbor, Target } from "./Chapter";
 import { buildIndex, parseGlossary } from "./glossary";
@@ -12,6 +12,7 @@ import type { Destination } from "./GoTo";
 import { CrossReferences } from "./CrossReferences";
 import type { RefSource } from "./CrossReferences";
 import { Library } from "./Library";
+import { ShareCard } from "./ShareCard";
 import { adjacent, chapterTitle } from "./nav";
 import type { Position } from "./nav";
 import { NoteEditor } from "./NoteEditor";
@@ -20,7 +21,7 @@ import { EMPTY_SEARCH, Search } from "./Search";
 import type { SearchMemory } from "./Search";
 import { SelectionBar } from "./SelectionBar";
 import { Settings } from "./Settings";
-import { applySettings, loadSettings, saveSettings } from "./userSettings";
+import { applySettings, FONTS, loadSettings, saveSettings, UI_FONT_STACK } from "./userSettings";
 import { loadJson, saveJson } from "./storage";
 import { quotation, referenceLabel, span } from "./verses";
 import { appVersion, findUpdate } from "./updater";
@@ -48,7 +49,7 @@ function keepInView(el: Element | null) {
 }
 
 /** The full-screen panels. Only one is open at a time. */
-type Panel = "goto" | "search" | "settings" | "library" | "votd" | "refs";
+type Panel = "goto" | "search" | "settings" | "library" | "votd" | "refs" | "share";
 const DEFAULT_POSITION: Position = { book: 1, chapter: 1 };
 
 interface SavedPosition extends Position {
@@ -115,6 +116,7 @@ function App() {
   const [selected, setSelected] = useState<ReadonlySet<number>>(new Set());
   const anchor = useRef<number | null>(null); // where a shift-click range starts
   const [note, setNote] = useState<NoteDraft | null>(null);
+  const [shareFor, setShareFor] = useState<{ reference: string; text: string } | null>(null);
   const [refsFor, setRefsFor] = useState<(RefSource & { label: string; text: string }) | null>(null);
   const [copied, setCopied] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -397,6 +399,14 @@ function App() {
     if (loaded) void attempt(toggleBookmark(loaded.book, loaded.chapter, chosen[0]));
   };
 
+  /** Opens the dialog that makes the selected verses into a picture to share. */
+  const openShare = () => {
+    if (!loaded || !ready || chosen.length === 0) return;
+    const text = loaded.verses.filter((v) => selected.has(v.verse)).map((v) => v.text).join(" ");
+    setShareFor({ reference: referenceLabel(title, loaded.chapter, chosen), text });
+    show("share");
+  };
+
   /** Opens the cross-references for the one selected verse, or for the verse the keyboard is on. */
   const openRefs = () => {
     if (!loaded || !ready) return;
@@ -593,6 +603,7 @@ function App() {
       else if (chosen.length > 0) {
         if (e.key === "b") bookmarkSelection();
         else if (e.key === "n") openNote();
+        else if (e.key === "i") openShare();
         else if (e.key === "c") copySelection();
         else if (/^[1-5]$/.test(e.key)) applyColor(HIGHLIGHT_COLORS[+e.key - 1]);
       }
@@ -673,6 +684,7 @@ function App() {
             onNote={() => openNote()}
             onBookmark={bookmarkSelection}
             onCopy={copySelection}
+            onShare={openShare}
             onRefs={chosen.length === 1 ? openRefs : null}
             onClear={clearSelection}
           />
@@ -733,6 +745,17 @@ function App() {
         />
       )}
       {panel === "library" && books.length > 0 && <Library books={books} onGo={navigate} onClose={closePanel} />}
+      {panel === "share" && shareFor && (
+        <ShareCard
+          reference={shareFor.reference}
+          text={shareFor.text}
+          translation={TRANSLATION_NAME}
+          fontStack={FONTS[settings.fontFamily].stack}
+          uiStack={UI_FONT_STACK}
+          theme={settings.theme}
+          onClose={closePanel}
+        />
+      )}
       {panel === "refs" && refsFor && books.length > 0 && (
         <CrossReferences
           books={books}

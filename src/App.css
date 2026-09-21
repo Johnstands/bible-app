@@ -1651,3 +1651,146 @@ kbd {
   opacity: 0.5;
   cursor: default;
 }
+
+/* ---- Share as an image ---- */
+
+.share {
+  width: min(56rem, 100%);
+  max-height: 90vh;
+}
+
+.share-body {
+  display: flex;
+  flex: 1;
+  gap: 1.75rem;
+  min-height: 0;
+  padding: 1.5rem;
+  overflow-y: auto;
+}
+
+.share-preview {
+  flex: 1 1 22rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+}
+
+.share-preview canvas {
+  display: block;
+  max-width: 100%;
+  max-height: 62vh;
+  width: auto;
+  height: auto;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  box-shadow: 0 6px 22px color-mix(in srgb, var(--ink) 12%, transparent);
+}
+
+.share-controls {
+  display: flex;
+  flex: 0 0 13rem;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.share-title {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+}
+
+.share-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.2rem;
+}
+
+.share-group button {
+  padding: 0.25rem 0;
+  font-size: 0.85rem;
+  color: var(--ink-muted);
+  border-bottom: 1.5px solid transparent;
+  transition:
+    color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
+}
+
+.share-group button:hover {
+  color: var(--ink);
+}
+
+.share-group button[aria-pressed="true"] {
+  color: var(--ink);
+  border-bottom-color: var(--accent);
+}
+
+.share-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.share-primary,
+.share-secondary {
+  padding: 0.6rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  border-radius: 4px;
+  transition:
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+
+.share-primary {
+  color: var(--bg);
+  background: var(--accent);
+}
+
+.share-primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 85%, var(--ink));
+}
+
+.share-secondary {
+  color: var(--ink);
+  border: 1px solid var(--rule);
+}
+
+.share-secondary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--gold) 12%, transparent);
+}
+
+.share-primary:disabled,
+.share-secondary:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.share-status {
+  min-height: 2.6em;
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--ink-muted);
+  overflow-wrap: anywhere;
+}
+
+.share-link {
+  padding: 0;
+  font: inherit;
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+@media (max-width: 720px) {
+  .share-body {
+    flex-direction: column;
+  }
+
+  .share-controls {
+    flex: none;
+  }
+}

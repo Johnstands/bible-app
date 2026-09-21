@@ -110,6 +110,8 @@ export interface CrossRef {
 /** Passages related to a verse, most useful first, with their text. */
 export const getCrossRefs = (translation: string, book: number, chapter: number, verse: number) =>
   invoke<CrossRef[]>("get_cross_refs", { translation, book, chapter, verse });
+/** Saves a PNG (a verse card) in the Pictures folder and returns the path it was saved to. */
+export const saveImage = (fileName: string, bytes: number[]) => invoke<string>("save_image", { fileName, bytes });
 export const getStrongs = (num: string) => invoke<StrongsEntry | null>("get_strongs", { num });
 
 export const HIGHLIGHT_COLORS = ["yellow", "green", "blue", "pink", "purple"] as const;

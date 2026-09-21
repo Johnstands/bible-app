@@ -23,6 +23,10 @@ export const FONTS = {
 } as const;
 export type FontFamily = keyof typeof FONTS;
 
+/** The face used for the interface, spelled out for places that can't read the CSS variable (a canvas). Keep it the
+ *  same as --font-ui in theme.css. */
+export const UI_FONT_STACK = '"Inter Variable", "Inter", system-ui, sans-serif';
+
 /** Reading size as a multiple of the base size (1 = the default 1.3rem). */
 export const FONT_SCALE = { min: 0.85, max: 1.6, step: 0.05, default: 1 } as const;
 
