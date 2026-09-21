@@ -39,7 +39,7 @@ jobs:
           NO_STRIP: "true" # linuxdeploy's bundled strip can't read newer libraries
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: "Bible App ${{ github.ref_name }}"
+          releaseName: "KJV Reader's Bible ${{ github.ref_name }}"
           releaseBody: "Install the AppImage or the .deb. Installed copies offer this version as an update once it is published."
           releaseDraft: true
           prerelease: false

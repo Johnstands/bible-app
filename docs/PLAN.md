@@ -1,4 +1,4 @@
-# Bible App Plan (Tauri v2)
+# KJV Reader's Bible Plan (Tauri v2)
 
 ## Decisions
 | Decision | Choice |

@@ -1,7 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "bible-app",
-  "version": "0.1.1",
+  "productName": "KJV Reader's Bible",
+  "mainBinaryName": "bible-app",
+  "version": "0.1.2",
   "identifier": "com.jxyeverfight.bibleapp",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -12,7 +13,7 @@
   "app": {
     "windows": [
       {
-        "title": "Bible",
+        "title": "KJV Reader's Bible",
         "width": 960,
         "height": 800,
         "minWidth": 480,

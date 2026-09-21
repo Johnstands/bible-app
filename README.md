@@ -1,4 +1,4 @@
-# Bible App
+# KJV Reader's Bible
 
 Offline-first desktop Bible app built with Tauri v2, React and TypeScript.
 

@@ -53,7 +53,7 @@ The AppImage bundles Wayland and epoxy libraries built for Ubuntu. On a newer sy
 the system's Mesa and WebKit aborts with `EGL_BAD_ALLOC`. `src-tauri/src/syslibs.rs` avoids this: when running from an
 AppImage it restarts itself once with the system's copies preloaded. It does nothing outside an AppImage, or when the
 system has none of those libraries. To check it after a release, run the AppImage plainly (no `LD_PRELOAD`):
-`APPIMAGE_EXTRACT_AND_RUN=1 ./bible-app_*.AppImage` on a machine without FUSE.
+`APPIMAGE_EXTRACT_AND_RUN=1 ./*.AppImage` on a machine without FUSE.
 
 ## What is checked on every push
 
