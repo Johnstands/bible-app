@@ -10,7 +10,7 @@ describe("sanitizeSettings", () => {
   });
 
   it("keeps valid values", () => {
-    const s = { theme: "dark", fontFamily: "literata", fontScale: 1.2, verseByVerse: true, pilcrows: true, verseOfTheDay: false, wordHelp: "changed" };
+    const s = { theme: "dark", fontFamily: "literata", fontScale: 1.2, verseByVerse: true, pilcrows: true, verseOfTheDay: false, wordHelp: "changed", originalWords: true };
     expect(sanitizeSettings(s)).toEqual(s);
   });
 
@@ -53,5 +53,12 @@ describe("clampScale", () => {
     expect(clampScale(9)).toBe(1.6);
     expect(sanitizeSettings({ fontScale: Infinity }).fontScale).toBe(1);
     expect(sanitizeSettings({ fontScale: NaN }).fontScale).toBe(1);
+  });
+
+  it("keeps original-language words off unless they were turned on", () => {
+    expect(DEFAULT_SETTINGS.originalWords).toBe(false);
+    expect(sanitizeSettings({}).originalWords).toBe(false);
+    expect(sanitizeSettings({ originalWords: true }).originalWords).toBe(true);
+    for (const bad of ["yes", 1, null, {}]) expect(sanitizeSettings({ originalWords: bad }).originalWords).toBe(false);
   });
 });

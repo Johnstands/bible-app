@@ -69,6 +69,7 @@ Purpose: help a modern reader understand the KJV. Words that are archaic, or tha
 - Reading plans with progress tracking.
 - Cross-references (needs a separate public-domain data source) and a copy or share verse card.
 - Optional: audio, or Strong's and lexicon data.
+- **Strong's numbers (done):** the KJV source tags about 349,000 phrases with Hebrew or Greek numbers, and Open Scriptures' edition of Strong's dictionaries supplies the entries. A setting ("Original-language words", off by default, or the S key) makes those words clickable: the card shows the original word, Strong's definition, how the KJV renders it, and a link that lists every verse using it (search `H7225` or `G26` works too). `word_tags` and `strongs` tables in `bible.db`; `src-tauri/src/strongs.rs`; `src/wordUnits.ts` merges the tags with word help.
 
 ## Phase 6: Polish and ship (done, apart from the optional title bar)
 - App icon, window state, accessibility pass.

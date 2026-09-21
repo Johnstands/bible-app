@@ -19,6 +19,8 @@ const SHORTCUTS: [string[], string][] = [
   [["B", "N", "C"], "Bookmark, add a note, or copy the selection"],
   [["1", "2", "3", "4", "5"], "Highlight the selection in a color"],
   [["W", "Shift+W"], "Open the next or previous word's meaning"],
+  [["S"], "Turn original-language words (Hebrew and Greek) on or off"],
+  [["Enter"], "With such a word's card open: list every verse that uses it"],
   [["Esc"], "Close a card or clear the selection"],
 ];
 
@@ -166,6 +168,12 @@ export function Settings({
               </div>
             </div>
             <Switch
+              label="Original-language words"
+              hint="Click a word of the text to see the Hebrew or Greek behind it, with Strong’s definition and every verse that uses it. Press S to switch this on or off while you read."
+              checked={settings.originalWords}
+              onChange={(originalWords) => set({ originalWords })}
+            />
+            <Switch
               label="Verse by verse"
               hint="Each verse on its own line, instead of flowing paragraphs."
               checked={settings.verseByVerse}
@@ -208,6 +216,14 @@ export function Settings({
                 Check for updates
               </button>
             )}
+          </section>
+
+          <section className="set-section">
+            <h2 className="set-heading">Sources</h2>
+            <p className="set-about">
+              The King James text and its Strong’s numbers are from eBible.org (public domain). Strong’s dictionary is by
+              James Strong (1890, 1894); its JSON edition is by Open Scriptures, licensed CC BY-SA.
+            </p>
           </section>
 
           <section className="set-section">

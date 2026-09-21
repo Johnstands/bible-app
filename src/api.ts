@@ -61,6 +61,40 @@ export const getChapter = (translation: string, book: number, chapter: number) =
 export const search = (query: string, scope: SearchScope, limit: number, offset: number) =>
   invoke<SearchResults>("search", { query, testament: scope.testament, book: scope.book, limit, offset });
 
+/** A phrase of a verse with a Strong's number; `start` and `end` slice the verse's text. */
+export interface WordTag {
+  start: number;
+  end: number;
+  /** `H7225` (Hebrew) or `G26` (Greek). */
+  num: string;
+}
+
+export interface VerseTags {
+  verse: number;
+  tags: WordTag[];
+}
+
+export interface StrongsEntry {
+  num: string;
+  /** The word in Hebrew or Greek letters. */
+  lemma: string;
+  translit: string;
+  /** How to say it (Hebrew entries only). */
+  pron: string | null;
+  /** Strong's entry: where the word comes from, then what it means. */
+  def: string;
+  /** Strong's own list of the KJV renderings. */
+  kjv: string | null;
+  /** How many phrases of the KJV carry this number. */
+  uses: number;
+  /** The most common KJV renderings, counted from the text itself. */
+  renderings: { word: string; count: number }[];
+}
+
+export const getWordTags = (translation: string, book: number, chapter: number) =>
+  invoke<VerseTags[]>("get_word_tags", { translation, book, chapter });
+export const getStrongs = (num: string) => invoke<StrongsEntry | null>("get_strongs", { num });
+
 export const HIGHLIGHT_COLORS = ["yellow", "green", "blue", "pink", "purple"] as const;
 export type HighlightColor = (typeof HIGHLIGHT_COLORS)[number];
 

@@ -1,7 +1,9 @@
 import { useMemo } from "react";
-import type { Book, ChapterMarks, HighlightColor, Verse } from "./api";
+import type { Book, ChapterMarks, HighlightColor, Verse, WordTag } from "./api";
 import { annotate, verseKey } from "./glossary";
-import type { GlossaryEntry, GlossaryIndex, Segment } from "./glossary";
+import type { GlossaryEntry, GlossaryIndex } from "./glossary";
+import { buildUnits } from "./wordUnits";
+import type { WordTarget } from "./wordUnits";
 import type { WordHelpLevel } from "./userSettings";
 import { chapterTitle } from "./nav";
 import type { Position } from "./nav";
@@ -22,6 +24,8 @@ export interface Layout {
   verseByVerse: boolean;
   pilcrows: boolean;
   wordHelp: WordHelpLevel;
+  /** Make tagged words clickable for their Hebrew or Greek original. */
+  originalWords: boolean;
 }
 
 type Item =
@@ -65,16 +69,18 @@ interface Props {
   layout: Layout;
   /** Archaic words and false friends to underline; null until the books are known. */
   glossary: GlossaryIndex | null;
+  /** Strong's numbers by verse; null until they are loaded, or when original-language words are off. */
+  tags: ReadonlyMap<number, WordTag[]> | null;
   prev: Neighbor | null;
   next: Neighbor | null;
   onNavigate: (pos: Position) => void;
   onVerseClick: (verse: number, e: React.MouseEvent) => void;
   onOpenNote: (verse: number) => void;
-  onWordClick: (entry: GlossaryEntry, word: string, anchor: HTMLElement) => void;
+  onWordClick: (target: WordTarget, anchor: HTMLElement) => void;
 }
 
 export function Chapter({
-  book, chapter, verses, marks, selected, cursor, target, layout, glossary, prev, next,
+  book, chapter, verses, marks, selected, cursor, target, layout, glossary, tags, prev, next,
   onNavigate, onVerseClick, onOpenNote, onWordClick,
 }: Props) {
   const items = toItems(verses);
@@ -86,27 +92,33 @@ export function Chapter({
     [verses, glossary, layout.wordHelp, book.id, chapter],
   );
 
+  // "Changed meanings" keeps only the words that look familiar but meant something else.
+  const shows = (e: GlossaryEntry) => layout.wordHelp === "all" || e.kind === "changed";
+  const units = useMemo(() => {
+    const byVerse = layout.originalWords ? tags : null;
+    if (!help && !byVerse) return null;
+    return new Map(verses.map((v) => [v.verse, buildUnits(v.text, help?.get(v.verse) ?? null, byVerse?.get(v.verse) ?? null, shows)]));
+  }, [verses, help, tags, layout.originalWords, layout.wordHelp]);
+
   const renderText = (v: Verse): React.ReactNode => {
-    const segments: Segment[] | undefined = help?.get(v.verse);
-    if (!segments) return v.text;
-    // "Changed meanings" keeps only the words that look familiar but meant something else.
-    const shown = (e: GlossaryEntry | undefined): e is GlossaryEntry => !!e && (layout.wordHelp === "all" || e.kind === "changed");
-    return segments.map((seg, i) => {
-      const entry = seg.entry;
-      if (!shown(entry)) return seg.text;
+    const parts = units?.get(v.verse);
+    if (!parts) return v.text;
+    return parts.map((u, i) => {
+      if (!u.entry && !u.nums) return u.text;
+      const classes = [u.entry && "kjv-word", u.nums && "orig-word"].filter(Boolean).join(" ");
       return (
         <span
           key={i}
-          className="kjv-word"
-          data-kind={entry.kind}
+          className={classes}
+          data-kind={u.entry?.kind}
           onClick={(e) => {
             // Copying a phrase by dragging over it must not open the card.
             if (window.getSelection()?.toString()) return;
             e.stopPropagation(); // and it isn't a click on the verse
-            onWordClick(entry, seg.text, e.currentTarget);
+            onWordClick({ word: u.helpWord ?? u.text, entry: u.entry, nums: u.nums }, e.currentTarget);
           }}
         >
-          {seg.text}
+          {u.text}
         </span>
       );
     });

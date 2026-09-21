@@ -38,6 +38,8 @@ export interface Settings {
   verseOfTheDay: boolean;
   /** Underline words that are archaic or meant something else in 1611; click one for its meaning. */
   wordHelp: WordHelpLevel;
+  /** Make the words of the text clickable for the Hebrew or Greek word behind them (Strong's numbers). */
+  originalWords: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -48,6 +50,7 @@ export const DEFAULT_SETTINGS: Settings = {
   pilcrows: false,
   verseOfTheDay: true,
   wordHelp: "all",
+  originalWords: false,
 };
 
 /** Rounds to the nearest step and keeps the size within range. */
@@ -79,6 +82,7 @@ export function sanitizeSettings(raw: unknown, legacyTheme?: unknown): Settings 
     pilcrows: typeof r.pilcrows === "boolean" ? r.pilcrows : d.pilcrows,
     verseOfTheDay: typeof r.verseOfTheDay === "boolean" ? r.verseOfTheDay : d.verseOfTheDay,
     wordHelp: sanitizeWordHelp(r.wordHelp) ?? d.wordHelp,
+    originalWords: typeof r.originalWords === "boolean" ? r.originalWords : d.originalWords,
   };
 }
 

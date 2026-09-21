@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
-import { EMPTY_MARKS, getChapter, getMarks, HIGHLIGHT_COLORS, listBooks, saveNote, setHighlight, toggleBookmark } from "./api";
-import type { Book, ChapterMarks, HighlightColor, Verse } from "./api";
+import { EMPTY_MARKS, getChapter, getMarks, getWordTags, HIGHLIGHT_COLORS, listBooks, saveNote, setHighlight, toggleBookmark } from "./api";
+import type { Book, ChapterMarks, HighlightColor, Verse, WordTag } from "./api";
 import glossaryText from "../data/glossary.txt?raw";
 import { TRANSLATION } from "./config";
 import { Chapter } from "./Chapter";
 import type { Neighbor, Target } from "./Chapter";
 import { buildIndex, parseGlossary } from "./glossary";
-import type { GlossaryEntry } from "./glossary";
 import { GoTo } from "./GoTo";
 import type { Destination } from "./GoTo";
 import { Library } from "./Library";
@@ -26,6 +25,7 @@ import { appVersion, findUpdate } from "./updater";
 import type { UpdateOffer } from "./updater";
 import { VerseOfTheDay } from "./VerseOfTheDay";
 import { WordHelp } from "./WordHelp";
+import type { WordTarget } from "./wordUnits";
 import { hasSeenVerseToday, markVerseSeen } from "./votd";
 import { KIND_LABELS } from "./glossary";
 import { shortcutLabel } from "./platform";
@@ -56,7 +56,15 @@ interface SavedPosition extends Position {
 interface Loaded extends Position {
   verses: Verse[];
   marks: ChapterMarks;
+  /** Strong's numbers by verse; null when original-language words are off or could not be loaded. */
+  tags: ReadonlyMap<number, WordTag[]> | null;
 }
+
+/** A chapter's Strong's tags by verse. A failure is not worth stopping the reader for. */
+const fetchTags = (book: number, chapter: number) =>
+  getWordTags(TRANSLATION, book, chapter)
+    .then((rows) => new Map(rows.map((r) => [r.verse, r.tags] as const)))
+    .catch(() => null);
 
 function loadPosition(): SavedPosition {
   const p = loadJson<Partial<SavedPosition>>("position");
@@ -109,7 +117,7 @@ function App() {
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [settings, setSettings] = useState(loadSettings);
-  const [help, setHelp] = useState<{ entry: GlossaryEntry; word: string; anchor: HTMLElement } | null>(null);
+  const [help, setHelp] = useState<{ target: WordTarget; anchor: HTMLElement } | null>(null);
   // The verse the keyboard is on. `shown` is false after a mouse click, so the outline only appears for keyboard users.
   const [cursor, setCursor] = useState<{ verse: number; shown: boolean } | null>(null);
   const [announcement, setAnnouncement] = useState<{ text: string; id: number } | null>(null);
@@ -137,16 +145,21 @@ function App() {
       .catch((e) => setError(String(e)));
   }, []);
 
+  // The chapter effect reads this instead of depending on it, so switching the setting doesn't reload the chapter.
+  const wantTags = useRef(settings.originalWords);
+  wantTags.current = settings.originalWords;
+
   useEffect(() => {
     let stale = false;
     Promise.all([
       getChapter(TRANSLATION, pos.book, pos.chapter),
       // Marks live in a separate DB; if it can't be read the chapter should still open.
       getMarks(pos.book, pos.chapter).catch(() => EMPTY_MARKS),
+      wantTags.current ? fetchTags(pos.book, pos.chapter) : Promise.resolve(null),
     ])
-      .then(([verses, marks]) => {
+      .then(([verses, marks, tags]) => {
         if (stale) return;
-        setLoaded({ book: pos.book, chapter: pos.chapter, verses, marks });
+        setLoaded({ book: pos.book, chapter: pos.chapter, verses, marks, tags });
         setError(null);
       })
       .catch((e) => !stale && setError(String(e)));
@@ -154,6 +167,19 @@ function App() {
       stale = true;
     };
   }, [pos.book, pos.chapter]);
+
+  // Turning original-language words on while reading fetches the open chapter's tags.
+  useEffect(() => {
+    if (!settings.originalWords || !loaded || loaded.tags) return;
+    let stale = false;
+    fetchTags(loaded.book, loaded.chapter).then((tags) => {
+      if (stale || !tags) return;
+      setLoaded((l) => (l && l.book === loaded.book && l.chapter === loaded.chapter ? { ...l, tags } : l));
+    });
+    return () => {
+      stale = true;
+    };
+  }, [settings.originalWords, loaded]);
 
   // The chapter on screen lags `pos` until its verses arrive; only act once they match.
   const ready = loaded !== null && loaded.book === pos.book && loaded.chapter === pos.chapter;
@@ -188,8 +214,8 @@ function App() {
     }
   }, [books]);
   const closeHelp = useCallback(() => setHelp(null), []);
-  const showWord = useCallback((entry: GlossaryEntry, word: string, anchorEl: HTMLElement) => {
-    setHelp((cur) => (cur?.anchor === anchorEl ? null : { entry, word, anchor: anchorEl })); // a second click puts it away
+  const showWord = useCallback((target: WordTarget, anchorEl: HTMLElement) => {
+    setHelp((cur) => (cur?.anchor === anchorEl ? null : { target, anchor: anchorEl })); // a second click puts it away
   }, []);
 
   useEffect(() => {
@@ -280,6 +306,11 @@ function App() {
   const openLibrary = () => show("library");
   const openSearch = (seed?: string) => {
     if (seed) searchMemory.current = { ...searchMemory.current, query: seed };
+    show("search");
+  };
+  /** Lists every verse that uses a Strong's number; an earlier testament or book filter would hide most of them. */
+  const searchNumber = (num: string) => {
+    searchMemory.current = { ...EMPTY_SEARCH, query: num };
     show("search");
   };
   const closePanel = () => setPanel(null);
@@ -440,7 +471,7 @@ function App() {
 
   /** Opens the card for the next (or previous) underlined word in the chapter, wrapping around. */
   const stepWord = (dir: 1 | -1) => {
-    const words = [...document.querySelectorAll<HTMLElement>(".kjv-word")];
+    const words = [...document.querySelectorAll<HTMLElement>(".kjv-word, .orig-word")];
     if (words.length === 0) {
       announce("This chapter has no word help.");
       return;
@@ -472,8 +503,12 @@ function App() {
   // Words opened from the keyboard are read out too.
   useEffect(() => {
     if (!help) return;
-    const { entry, word } = help;
-    announce(`${word}, ${KIND_LABELS[entry.kind]}: ${entry.meaning}.${entry.today ? ` Today: ${entry.today}.` : ""}`);
+    const { entry, word, nums } = help.target;
+    const original = nums?.[0] ? `${nums[0].startsWith("H") ? "Hebrew" : "Greek"} word ${nums[0]}` : null;
+    const said = entry
+      ? `${word}, ${KIND_LABELS[entry.kind]}: ${entry.meaning}.${entry.today ? ` Today: ${entry.today}.` : ""}${original ? ` Also a ${original}.` : ""}`
+      : `${word}, ${original}.`;
+    announce(original ? `${said} Press Enter to list every verse that uses it.` : said);
   }, [help, announce]);
 
   // One stable listener that calls the latest handler. Re-registering per render would drop keys:
@@ -505,6 +540,18 @@ function App() {
         e.target instanceof HTMLElement &&
         (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.isContentEditable);
       if (e.ctrlKey || e.metaKey || e.altKey || typing || overlayOpen) return;
+      const openNum = help?.target.nums?.[0];
+      if (e.key === "Enter" && openNum && !(e.target instanceof HTMLButtonElement)) {
+        e.preventDefault();
+        searchNumber(openNum);
+        return;
+      }
+      if (e.key === "s" || e.key === "S") {
+        const on = !settings.originalWords;
+        setSettings({ ...settings, originalWords: on });
+        announce(on ? "Original-language words on. Click a word for its Hebrew or Greek." : "Original-language words off.");
+        return;
+      }
       if (e.key === "Escape") {
         if (help) setHelp(null);
         else {
@@ -581,6 +628,7 @@ function App() {
                 target={ready ? target : null}
                 layout={settings}
                 glossary={glossary}
+                tags={settings.originalWords ? loaded.tags : null}
                 prev={prev}
                 next={next}
                 onNavigate={(p) => navigate({ ...p })}
@@ -612,7 +660,7 @@ function App() {
 
       {help && !overlayOpen && (
         <div role="region" aria-label="Word meaning">
-          <WordHelp entry={help.entry} word={help.word} anchor={help.anchor} onClose={closeHelp} />
+          <WordHelp target={help.target} anchor={help.anchor} onClose={closeHelp} onSearchNumber={searchNumber} />
         </div>
       )}
 

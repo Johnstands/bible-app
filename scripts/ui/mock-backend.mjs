@@ -9,6 +9,20 @@ const ROOT = path.resolve(import.meta.dirname, "../..");
 const db = new DatabaseSync(path.join(ROOT, "src-tauri/resources/bible.db"), { readOnly: true });
 
 const bool = (n) => n === 1;
+/** "h7225", "G 26" -> "H7225" / "G26"; null when the query isn't a Strong's number. */
+const strongsNumber = (q) => {
+  const m = /^\s*([HhGg])\s*(\d{1,5})\s*$/.exec(q);
+  return m && +m[2] > 0 ? `${m[1].toUpperCase()}${+m[2]}` : null;
+};
+/** The verse text with each [start, end) span wrapped in the search-match markers. */
+const markSpans = (text, spans) => {
+  let out = "", at = 0;
+  for (const [a, b] of [...spans].sort((x, y) => x[0] - y[0])) {
+    out += `${text.slice(at, a)}\u0001${text.slice(a, b)}\u0002`;
+    at = b;
+  }
+  return out + text.slice(at);
+};
 const ftsQuery = (q) => {
   const words = q.split(/[^\p{L}\p{N}]+/u).filter(Boolean);
   return words.length ? words.map((w, i) => (i === words.length - 1 ? `"${w}"*` : `"${w}"`)).join(" ") : null;
@@ -36,7 +50,39 @@ export function createBackend({ update = null } = {}) {
           verse: r.verse, verseEnd: r.verse_end, text: r.text, kind: r.kind, newBlock: bool(r.new_block), gap: bool(r.gap),
           heading: r.heading, headingKind: r.heading_kind, subscription: r.subscription,
         })),
+    get_word_tags: ({ translation, book, chapter }) => {
+      const rows = db.prepare(`SELECT v.verse, t.start_at AS start, t.end_at AS end, t.num
+        FROM verses v JOIN word_tags t ON t.verse_id = v.id
+        WHERE v.translation = ? AND v.book = ? AND v.chapter = ? ORDER BY v.verse, t.start_at`).all(translation, book, chapter);
+      const byVerse = new Map();
+      for (const r of rows) {
+        if (!byVerse.has(r.verse)) byVerse.set(r.verse, { verse: r.verse, tags: [] });
+        byVerse.get(r.verse).tags.push({ start: r.start, end: r.end, num: r.num });
+      }
+      return [...byVerse.values()];
+    },
+    get_strongs: ({ num }) => {
+      const n = strongsNumber(num);
+      const e = n && db.prepare("SELECT lemma, translit, pron, def, kjv FROM strongs WHERE num = ?").get(n);
+      if (!e) return null;
+      const uses = db.prepare("SELECT COUNT(*) AS n FROM word_tags WHERE num = ?").get(n).n;
+      const renderings = db.prepare(`SELECT lower(substr(v.text, t.start_at + 1, t.end_at - t.start_at)) AS word, COUNT(*) AS count
+        FROM word_tags t JOIN verses v ON v.id = t.verse_id WHERE t.num = ? GROUP BY word ORDER BY count DESC, word LIMIT 8`).all(n);
+      return { num: n, lemma: e.lemma, translit: e.translit, pron: e.pron, def: e.def, kjv: e.kjv, uses, renderings };
+    },
     search: ({ query, testament, book, limit = 50, offset = 0 }) => {
+      const num = strongsNumber(query);
+      if (num) {
+        const from = `FROM word_tags t JOIN verses v ON v.id = t.verse_id JOIN books b ON b.id = v.book
+          WHERE t.num = ? AND (? IS NULL OR b.testament = ?) AND (? IS NULL OR v.book = ?)`;
+        const args = [num, testament ?? null, testament ?? null, book ?? null, book ?? null];
+        const total = db.prepare(`SELECT COUNT(DISTINCT v.id) AS n ${from}`).get(...args).n;
+        const hits = db.prepare(`SELECT v.translation, v.book, b.name AS bookName, v.chapter, v.verse, v.text,
+            group_concat(t.start_at || ',' || t.end_at, ';') AS spans ${from}
+            GROUP BY v.id ORDER BY v.book, v.chapter, v.verse LIMIT ? OFFSET ?`).all(...args, limit, offset)
+          .map(({ text, spans, ...h }) => ({ ...h, snippet: markSpans(text, spans.split(";").map((p) => p.split(",").map(Number))) }));
+        return { total, hits };
+      }
       const q = ftsQuery(query);
       if (!q) return { total: 0, hits: [] };
       const from = `FROM verses_fts JOIN verses v ON v.id = verses_fts.rowid JOIN books b ON b.id = v.book

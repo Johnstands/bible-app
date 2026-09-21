@@ -45,8 +45,19 @@ It expects Chromium at `/usr/bin/chromium` (override with `CHROMIUM`).
 
 Archaic words and words whose meaning has changed are underlined; click one for its meaning. The list lives in `data/glossary.txt`, one entry per line (`forms | kind | meaning | today | verses`; the format is explained at the top of the file). `npm test` checks it against the real Bible text. To look for words still missing, run `npm run data:fetch -- web` and then `npm run glossary:gaps`, which lists words that are common in the KJV but absent from the modern World English Bible. `npm run glossary:review` writes `docs/glossary-review.md`, a checklist of every entry with real verses beside it, for reviewing the definitions.
 
+Settings also has **Original-language words** (off by default; press S to switch it while reading). With it on, nearly every word of the text is clickable and the card shows the Hebrew or Greek behind it, from Strong's dictionary, with a link listing every verse that uses it. Searching `H7225` or `G26` does the same.
+
 ## Building and releasing
 
 `npm run tauri build` makes the Linux packages (a `.deb` and an AppImage) in `src-tauri/target/release/bundle/`. Releases, signing and the update mechanism are described in [docs/RELEASING.md](docs/RELEASING.md).
 
 The UI tests and screenshot scripts need Chromium. They look for `/usr/bin/chromium`; set `CHROMIUM` to use another browser. `node scripts/ui/axe-summary.mjs` (with `npm run ui:dev` running) lists accessibility findings across every screen and theme.
+
+## Credits and licences
+
+- **King James text** and the **Strong's numbers** attached to its words: [eBible.org](https://ebible.org), public domain.
+- **Strong's dictionaries** of Hebrew and Greek (James Strong, 1890 and 1894; the text is public domain). The JSON edition
+  used here is by [Open Scriptures](https://github.com/openscriptures/strongs) and is licensed
+  [CC BY-SA](https://creativecommons.org/licenses/by-sa/3.0/). It is downloaded by `npm run data:fetch` and built into
+  `bible.db`; anything you distribute that includes that data carries the same licence for it.
+- The word-help glossary (`data/glossary.txt`) is original to this project.
