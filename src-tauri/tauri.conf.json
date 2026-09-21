@@ -49,7 +49,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEVEQkY5NjI0REVBOEE2RUUKUldUdXBxamVKSmEvN2VKMW1QTzM5YThuY0FYVVNEN3dvaXpDUnVaNEpaV1dnZEZGOFZnMU11VzEK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEFBOEE4QkNGRkE5MjZDMkYKUldRdmJKTDZ6NHVLcXF6VnN0NkhneTIzeGI1ME9TbHJtdTk1WVVXOUxMZnJwNWtvS2M2bnRXNjUK",
       "endpoints": [
         "https://github.com/Johnstands/bible-app/releases/latest/download/latest.json"
       ]
