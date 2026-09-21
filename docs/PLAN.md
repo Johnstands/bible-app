@@ -34,7 +34,7 @@
 - Full-text search with highlighted matches and result snippets.
 - Filters by testament or book.
 - **Done when:** search returns results in well under 100 ms.
-- **Result:** the Search panel (`Ctrl+F` or the top-bar button) searches as you type, with stemming ("love" also finds "loved"), exact phrases in quotes, filters for the whole Bible, either testament or one book, highlighted matches, a total count, "Show more" paging, and Enter or click to jump to the verse. The Go-to panel offers a "Search for" row for anything typed, and the last query and filters are remembered. Release-build timing: 42 ms for the worst case ("the", 27k matches), under 10 ms for everything else (`cargo test --release`).
+- **Result:** the Search panel (`Ctrl+F` or the top-bar button) searches as you type, with stemming ("love" also finds "loved"), exact phrases in quotes, filters for the whole Bible, either testament or one book, highlighted matches, a total count, "Show more" paging, and Enter or click to jump to the verse. The Go-to panel offers a "Search for" row for anything typed, and the last query and filters are remembered. Results are listed in Bible order (Genesis first), not by relevance, and "Show more" carries on from where the list ended; a search by Strong's number is ordered the same way. Release-build timing: 42 ms for the worst case ("the", 27k matches), under 10 ms for everything else (`cargo test --release`).
 
 ## Phase 4: Personalization (done)
 - Verse selection, then highlight colors, notes and bookmarks.

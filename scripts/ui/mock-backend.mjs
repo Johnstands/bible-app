@@ -124,7 +124,7 @@ export function createBackend({ update = null } = {}) {
       const args = [q, testament ?? null, testament ?? null, book ?? null, book ?? null];
       const total = db.prepare(`SELECT COUNT(*) AS n ${from}`).get(...args).n;
       const hits = db.prepare(`SELECT v.translation, v.book, b.name AS bookName, v.chapter, v.verse,
-          snippet(verses_fts, 0, char(1), char(2), '…', 32) AS snippet ${from} ORDER BY verses_fts.rank LIMIT ? OFFSET ?`)
+          snippet(verses_fts, 0, char(1), char(2), '…', 32) AS snippet ${from} ORDER BY v.book, v.chapter, v.verse, v.translation LIMIT ? OFFSET ?`)
         .all(...args, limit, offset);
       return { total, hits };
     },

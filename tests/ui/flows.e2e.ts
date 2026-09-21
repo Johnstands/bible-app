@@ -146,6 +146,45 @@ describe("search", () => {
     expect(await app.page.$(".search")).toBeNull();
   });
 
+  it("lists results in Bible order, Genesis first, and keeps that order when more are loaded", async () => {
+    const ORDER = [
+      "Genesis", "Exodus", "Leviticus", "Numbers", "Deuteronomy", "Joshua", "Judges", "Ruth", "1 Samuel", "2 Samuel",
+      "1 Kings", "2 Kings", "1 Chronicles", "2 Chronicles", "Ezra", "Nehemiah", "Esther", "Job", "Psalm", "Proverbs",
+      "Ecclesiastes", "Song of Solomon", "Isaiah", "Jeremiah", "Lamentations", "Ezekiel", "Daniel", "Hosea", "Joel", "Amos",
+      "Obadiah", "Jonah", "Micah", "Nahum", "Habakkuk", "Zephaniah", "Haggai", "Zechariah", "Malachi", "Matthew", "Mark",
+      "Luke", "John", "Acts", "Romans", "1 Corinthians", "2 Corinthians", "Galatians", "Ephesians", "Philippians",
+      "Colossians", "1 Thessalonians", "2 Thessalonians", "1 Timothy", "2 Timothy", "Titus", "Philemon", "Hebrews", "James",
+      "1 Peter", "2 Peter", "1 John", "2 John", "3 John", "Jude", "Revelation",
+    ];
+    /** "1 John 4:8" -> [book number, chapter, verse] */
+    const place = (ref: string): [number, number, number] => {
+      const m = /^(.+) (\d+):(\d+)$/.exec(ref.trim())!;
+      return [ORDER.indexOf(m[1]), Number(m[2]), Number(m[3])];
+    };
+    const cmp = (a: number[], b: number[]) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
+
+    app = await startApp();
+    await app.page.keyboard.press("Control+f");
+    await app.page.fill(".goto-input", "love");
+    await app.page.waitForSelector(".hit");
+    const refs = () => app.page.$$eval(".hit .hit-ref", (els) => els.map((e) => e.textContent!.trim()));
+    const expectBibleOrder = (shown: string[]) => {
+      for (let i = 1; i < shown.length; i++) expect(cmp(place(shown[i - 1]), place(shown[i])), `${shown[i - 1]} then ${shown[i]}`).toBeLessThan(0);
+    };
+    let shown = await refs();
+    expect(shown[0]).toMatch(/^Genesis /);
+    expect(shown.length).toBeGreaterThan(20);
+    expectBibleOrder(shown);
+
+    // Loading more carries on from where the list ended.
+    const before = shown.length;
+    await app.page.click(".hit-more");
+    await app.page.waitForFunction((n) => document.querySelectorAll(".hit").length > n, before);
+    shown = await refs();
+    expect(shown.length).toBeGreaterThan(before);
+    expectBibleOrder(shown);
+  });
+
   it("remembers the last query and offers a search from Go to", async () => {
     app = await startApp();
     await app.page.keyboard.press("Control+f");

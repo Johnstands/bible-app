@@ -236,7 +236,7 @@ const SEARCH_FROM_WHERE: &str = "
       AND (?3 IS NULL OR b.testament = ?3)
       AND (?4 IS NULL OR v.book = ?4)";
 
-/// Full-text search, best matches first, with the total number of matches for paging. A Strong's number
+/// Full-text search, in Bible order (Genesis first), with the total number of matches for paging. A Strong's number
 /// (`H7225`, `G26`) instead lists the verses that use it, in Bible order.
 pub fn search(
     conn: &Connection,
@@ -262,7 +262,7 @@ pub fn search(
         "SELECT v.translation, v.book, b.name, v.chapter, v.verse,
                 snippet(verses_fts, 0, char({start}), char({end}), '…', 32)
          {SEARCH_FROM_WHERE}
-         ORDER BY verses_fts.rank
+         ORDER BY v.book, v.chapter, v.verse, v.translation
          LIMIT ?5 OFFSET ?6",
         start = MATCH_START as u32,
         end = MATCH_END as u32,
@@ -477,6 +477,44 @@ mod tests {
         let key = |h: &SearchHit| (h.book, h.chapter, h.verse);
         assert!(first.hits.iter().all(|a| second.hits.iter().all(|b| key(a) != key(b))));
         assert!(search(&conn, "lord", &all, 20, first.total).unwrap().hits.is_empty());
+    }
+
+    #[test]
+    fn results_come_in_bible_order_not_by_relevance() {
+        let conn = bible();
+        let all = SearchFilter::default();
+        let key = |h: &SearchHit| (h.book, h.chapter, h.verse);
+
+        // Every verse that has the word, from Genesis to Revelation, once each.
+        let r = search(&conn, "love", &all, 5_000, 0).unwrap();
+        assert_eq!(r.hits.len() as u32, r.total);
+        assert!(r.total > 300, "{} verses", r.total);
+        assert!(r.hits.windows(2).all(|w| key(&w[0]) < key(&w[1])), "Bible order, one hit per verse");
+        assert_eq!(r.hits[0].book_name, "Genesis", "the first verse in the Bible that has the word comes first");
+
+        // A phrase and a prefix are ordered the same way.
+        for q in ["\"in the beginning\"", "shep", "the lord said"] {
+            let r = search(&conn, q, &all, 5_000, 0).unwrap();
+            assert!(r.hits.windows(2).all(|w| key(&w[0]) < key(&w[1])), "{q:?}");
+        }
+    }
+
+    #[test]
+    fn pages_continue_in_bible_order_and_filters_keep_it() {
+        let conn = bible();
+        let all = SearchFilter::default();
+        let key = |h: &SearchHit| (h.book, h.chapter, h.verse);
+        let first = search(&conn, "lord", &all, 20, 0).unwrap();
+        let second = search(&conn, "lord", &all, 20, 20).unwrap();
+        assert!(key(first.hits.last().unwrap()) < key(&second.hits[0]), "page two starts after page one ends");
+
+        let nt = SearchFilter { testament: Some("NT"), ..Default::default() };
+        let r = search(&conn, "love", &nt, 5_000, 0).unwrap();
+        assert!(r.hits[0].book >= 40, "the New Testament starts at Matthew");
+        assert!(r.hits.windows(2).all(|w| key(&w[0]) < key(&w[1])));
+        let john = SearchFilter { book: Some(43), ..Default::default() };
+        let r = search(&conn, "love", &john, 5_000, 0).unwrap();
+        assert!(r.hits.iter().all(|h| h.book == 43) && r.hits.windows(2).all(|w| key(&w[0]) < key(&w[1])));
     }
 
     #[test]
