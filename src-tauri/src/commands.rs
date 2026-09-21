@@ -1,5 +1,6 @@
 use crate::db::{self, Book, Result, SearchFilter, SearchResults, Translation, Verse};
 use crate::user::{self, ChapterMarks, Library, Note};
+use crate::strongs::{self, StrongsEntry, VerseTags};
 use crate::AppState;
 use tauri::State;
 
@@ -24,6 +25,23 @@ pub fn get_chapter(
     chapter: u32,
 ) -> Result<Vec<Verse>> {
     db::get_chapter(&state.bible.lock().unwrap(), &translation, book, chapter)
+}
+
+/// The phrases of a chapter that carry Strong's numbers, for the reader's original-language words.
+#[tauri::command]
+pub fn get_word_tags(
+    state: State<AppState>,
+    translation: String,
+    book: u32,
+    chapter: u32,
+) -> Result<Vec<VerseTags>> {
+    strongs::get_word_tags(&state.bible.lock().unwrap(), &translation, book, chapter)
+}
+
+/// The dictionary entry for a Strong's number such as `H7225`, or null if there is none.
+#[tauri::command]
+pub fn get_strongs(state: State<AppState>, num: String) -> Result<Option<StrongsEntry>> {
+    strongs::get_strongs(&state.bible.lock().unwrap(), &num)
 }
 
 #[tauri::command]

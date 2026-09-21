@@ -13,7 +13,19 @@ fetch() {
   echo "$id: downloaded"
 }
 
+# Strong's Hebrew and Greek dictionaries (James Strong, 1890/1894; JSON edition by Open Scriptures, CC BY-SA).
+fetch_strongs() {
+  local base="https://raw.githubusercontent.com/openscriptures/strongs/master" dest="data/sources/strongs"
+  mkdir -p "$dest"
+  for f in greek/strongs-greek-dictionary.js hebrew/strongs-hebrew-dictionary.js; do
+    if [ -f "$dest/$(basename "$f")" ]; then echo "strongs/$(basename "$f"): already present"; continue; fi
+    curl -fsSL "$base/$f" -o "$dest/$(basename "$f")"
+    echo "strongs/$(basename "$f"): downloaded"
+  done
+}
+
 fetch eng-kjv2006
+fetch_strongs
 # The modern World English Bible is only used to find archaic KJV words: `npm run data:fetch -- web`.
 [ "${1:-}" = "web" ] && fetch eng-web
 true

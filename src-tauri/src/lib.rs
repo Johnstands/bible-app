@@ -1,5 +1,6 @@
 mod commands;
 mod db;
+mod strongs;
 mod syslibs;
 mod user;
 
@@ -39,6 +40,8 @@ pub fn run() {
             commands::list_books,
             commands::get_chapter,
             commands::search,
+            commands::get_word_tags,
+            commands::get_strongs,
             commands::get_marks,
             commands::set_highlight,
             commands::save_note,

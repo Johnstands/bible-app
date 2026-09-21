@@ -216,7 +216,8 @@ const SEARCH_FROM_WHERE: &str = "
       AND (?3 IS NULL OR b.testament = ?3)
       AND (?4 IS NULL OR v.book = ?4)";
 
-/// Full-text search, best matches first, with the total number of matches for paging.
+/// Full-text search, best matches first, with the total number of matches for paging. A Strong's number
+/// (`H7225`, `G26`) instead lists the verses that use it, in Bible order.
 pub fn search(
     conn: &Connection,
     query: &str,
@@ -224,6 +225,10 @@ pub fn search(
     limit: u32,
     offset: u32,
 ) -> Result<SearchResults> {
+    // "H7225" or "G26" lists every verse that uses that Hebrew or Greek word.
+    if let Some(num) = crate::strongs::parse_number(query) {
+        return crate::strongs::search_number(conn, &num, filter, limit, offset);
+    }
     let Some(q) = fts_query(query) else {
         return Ok(SearchResults { total: 0, hits: Vec::new() });
     };
