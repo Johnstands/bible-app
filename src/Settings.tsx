@@ -1,5 +1,7 @@
 import { useEffect, useRef } from "react";
-import { clampScale, DEFAULT_SETTINGS, FONT_SCALE, FONTS, THEME_LABELS, THEMES } from "./settings";
+import {
+  clampScale, DEFAULT_SETTINGS, FONT_SCALE, FONTS, THEME_LABELS, THEMES, WORD_HELP_LABELS, WORD_HELP_LEVELS,
+} from "./settings";
 import type { FontFamily, Settings as SettingsValue } from "./settings";
 
 interface Props {
@@ -123,6 +125,20 @@ export function Settings({ settings, onChange, onShowVerse, onClose }: Props) {
 
           <section className="set-section">
             <h2 className="set-heading">Text</h2>
+            <div className="set-choice">
+              <span className="switch-label">Word help</span>
+              <span className="switch-hint">
+                Underline words that are archaic or meant something else in 1611; click one for its meaning.
+                “Changed meanings” marks only familiar-looking words that mislead.
+              </span>
+              <div className="set-levels" role="group" aria-label="Word help">
+                {WORD_HELP_LEVELS.map((level) => (
+                  <button key={level} aria-pressed={settings.wordHelp === level} onClick={() => set({ wordHelp: level })}>
+                    {WORD_HELP_LABELS[level]}
+                  </button>
+                ))}
+              </div>
+            </div>
             <Switch
               label="Verse by verse"
               hint="Each verse on its own line, instead of flowing paragraphs."

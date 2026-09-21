@@ -14,3 +14,6 @@ fetch() {
 }
 
 fetch eng-kjv2006
+# The modern World English Bible is only used to find archaic KJV words: `npm run data:fetch -- web`.
+[ "${1:-}" = "web" ] && fetch eng-web
+true

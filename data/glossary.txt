@@ -1,0 +1,630 @@
+# KJV word help
+#
+# One entry per line:   forms | kind | meaning | today | verses
+#   forms   comma-separated, lowercase; a form with spaces is a phrase
+#   kind    archaic   a word or form no longer in ordinary use
+#           changed   still in use, but the KJV meaning is different (a "false friend")
+#           unit      an old measure, weight or coin
+#   meaning what it means in the KJV
+#   today   (optional) what a modern reader is likely to assume instead
+#   verses  (optional) "@ Book 1:2; Book 3:4": the entry applies only in these verses, for words
+#           that keep their modern meaning everywhere else
+# Lines starting with # are comments. The definitions are written for the KJV's own usage.
+
+# ---- Where, when and how: adverbs and conjunctions -------------------------------------------
+whither | archaic | to what place; to where
+hither | archaic | to this place; here
+thither | archaic | to that place; there
+whence | archaic | from where
+thence | archaic | from that place; from there
+thitherward | archaic | toward that place
+whithersoever | archaic | to whatever place; wherever
+wherefore | archaic | why; for what reason (also: therefore, for that reason)
+verily | archaic | truly; certainly; in truth
+peradventure | archaic | perhaps; maybe; by chance
+haply | archaic | perhaps; by chance
+nigh | archaic | near; close
+anon | changed | immediately; at once | Today: soon, or later
+by and by | changed | immediately; at once | Today: after a while
+straightway | archaic | immediately; at once
+forthwith | archaic | immediately; at once
+presently | changed | immediately; at once | Today: in a little while
+oft, oftentimes, ofttimes | archaic | often
+betimes | archaic | early; in good time
+ere | archaic | before
+betwixt | archaic | between
+twain | archaic | two
+naught, nought | archaic | nothing
+whit | archaic | the smallest bit ("every whit" = completely)
+howbeit | archaic | however; nevertheless
+withal | archaic | with it; as well; at the same time
+yonder | archaic | over there; at that distance
+heretofore | archaic | until now; before this
+beforetime | archaic | previously; in earlier times
+aforetime, afore | archaic | earlier; before
+thereof, thereon, thereto, thereunto, therewith, thereat, thereupon, thereout, therefrom | archaic | of it; on it; to it; with it; at it (that thing just mentioned)
+whereof, whereon, whereunto, whereto, whereinto, wherewith, wherewithal | archaic | of which; on which; to which; with which
+asunder | archaic | apart; into pieces
+straitly | archaic | strictly; sternly
+uprightly | archaic | honestly; with integrity
+
+# ---- Verbs, and old past tenses --------------------------------------------------------------
+ wist, wot, wotteth | archaic | knew; know
+durst | archaic | dared
+spake | archaic | spoke
+smite, smiteth, smiting | archaic | strike; hit; defeat
+smote, smitten | archaic | struck; hit; defeated
+slew | archaic | killed
+slay, slayeth | archaic | kill
+begat | archaic | fathered (had a child as the father)
+begotten | archaic | fathered; born of a father
+beget | archaic | to father
+brake | archaic | broke
+drave | archaic | drove
+sware | archaic | swore
+gat | archaic | got
+forgat | archaic | forgot
+tare | archaic | tore
+trode | archaic | trod; stepped on
+builded | archaic | built
+digged | archaic | dug
+wrought | archaic | worked; made; did
+rent | archaic | tore; torn
+rend | archaic | tear apart
+girt | archaic | tied around; girded
+waxed, waxen, waxeth | archaic | grew; became
+lien | archaic | lain
+holpen | archaic | helped
+holden | archaic | held
+sod | archaic | boiled
+sodden | archaic | boiled
+seethe, seething | archaic | boil; boiling
+chode | archaic | quarrelled
+chide | archaic | quarrel with; scold
+spue | archaic | vomit
+bade | archaic | commanded; told
+bidden | archaic | invited; commanded
+besought | archaic | begged
+beseech, beseeching | archaic | beg; ask earnestly
+ intreat, intreated | archaic | plead with; beg; also, treat
+hearken, hearkened, hearkenedst, hearkeneth | archaic | listen; pay attention
+tarry, tarried, tarrieth, tarrying | archaic | wait; stay; linger
+abode | archaic | stayed; lived; also, a dwelling
+communed, commune, communing | archaic | talked together
+astonied | archaic | astonished; stunned
+affrighted | archaic | frightened
+discomfited | archaic | defeated; thrown into confusion
+requite, requited | archaic | repay; pay back
+avouched | archaic | declared; affirmed
+adjured | archaic | solemnly commanded, under oath
+minish, minished | archaic | reduce; make less
+supplant, supplanted | archaic | trip up; overthrow by trickery
+whet | archaic | sharpen
+noised | archaic | spread as news; made known
+ dissembled | archaic | pretended; hid one's real feelings
+hough, houghed | archaic | cripple by cutting the tendons of the back legs
+flay, flayed | archaic | skin (strip the skin from)
+forbare | archaic | held back; refrained
+railed | archaic | shouted insults
+revile, reviled | archaic | insult; abuse
+beguiled, beguile | archaic | deceived; tricked
+buffeted, buffet | archaic | struck with the fist; beaten
+platted | archaic | braided
+contemned | archaic | despised
+espoused | archaic | engaged to be married
+disallowed | archaic | rejected
+disannul | archaic | cancel; make void
+assayed | archaic | tried; attempted
+strawed | archaic | scattered; spread out
+mete, meted | archaic | measure out
+sup | archaic | eat supper; dine
+lade, laded, ladeth | archaic | load; loaded
+lighted | archaic | got down; came down and landed
+stablish, stablished | archaic | establish; make firm
+dumb | changed | unable to speak; silent | Today: stupid
+ listed, listeth | archaic | wish; wished; chooses
+trow | archaic | think; suppose
+fain | archaic | gladly; willing
+eschew, eschewed | archaic | avoid; shun
+vaunt, vaunteth | archaic | boast; brag
+wrest | archaic | twist; pervert; distort
+bewray, bewrayeth | archaic | reveal; give away
+cieled | archaic | paneled; lined with wood
+garnished | archaic | decorated; adorned
+furbished | archaic | polished
+imputed, impute, imputeth | archaic | counted to someone's account; credited
+certify | archaic | make known; declare
+apprehended | changed | seized; caught; taken hold of | Today: arrested, or understood
+
+# ---- Everyday things and people (archaic nouns and adjectives) --------------------------------
+hosts | archaic | armies; large forces ("LORD of hosts" = LORD of armies)
+morrow | archaic | tomorrow; the next day
+stead | archaic | place ("in his stead" = in his place)
+raiment | archaic | clothing
+graven | archaic | carved ("graven image" = carved idol)
+wroth | archaic | very angry
+staves | archaic | staffs; poles
+damsel, damsels | archaic | young woman; girl
+girdle, girdles | archaic | belt; sash
+fenced | archaic | fortified; walled ("fenced cities")
+divers | archaic | various; several
+ward | archaic | guard; custody; prison
+firstling, firstlings | archaic | firstborn animal
+froward | archaic | stubborn; contrary; perverse
+husbandman, husbandmen | archaic | farmer
+inwards | archaic | inner organs; entrails
+recompence | archaic | repayment; reward
+league | archaic | treaty; alliance
+basons, bason | archaic | bowls
+shewbread | archaic | the bread set out before God in the tabernacle
+armourbearer | archaic | a soldier who carried a warrior's weapons
+victuals, victual | archaic | food; supplies
+bondman, bondmen, bondwoman, bondmaid, bondmaids | archaic | slave; servant
+threshingfloor | archaic | the flat ground where grain was threshed
+longsuffering | archaic | patience; slow to anger
+charger, chargers | archaic | a large flat dish; platter
+comely, comeliness | archaic | pleasant to look at; attractive; fitting
+brimstone | archaic | sulphur (burning stone)
+nether | archaic | lower
+laver, lavers | archaic | a large basin for washing
+privily | archaic | secretly
+scall | archaic | a scabby skin disease
+vexation | archaic | trouble; distress
+gall | archaic | a bitter, poisonous plant or fluid; bitterness
+psaltery, psalteries | archaic | a stringed instrument, like a harp
+quicken, quickened, quickeneth | changed | make alive; give life to | Today: speed up
+palsy | archaic | paralysis
+servile | archaic | of ordinary daily labour ("servile work" = regular work)
+similitude | archaic | likeness; image; comparison
+scorner | archaic | someone who mocks
+damnation | changed | condemnation; judgment | Today: eternal punishment in hell
+damned | changed | condemned; found guilty | Today: sent to hell
+carnal | changed | of the flesh; worldly; of the body | Today: sexual
+knop, knops | archaic | an ornamental bud or knob
+taches | archaic | clasps; fasteners
+wreathen | archaic | twisted
+whelps, whelp | archaic | young animals; cubs
+vale | archaic | valley
+obeisance | archaic | a bow; a show of respect
+wont | archaic | accustomed; used to
+stiffnecked | archaic | stubborn
+hart | archaic | male deer; stag
+cruse | archaic | a small jar or flask
+degrees | archaic | steps; stairs
+spoiler, spoilers | archaic | a robber; plunderer
+defenced | archaic | fortified
+hungred | archaic | hungry
+butler | changed | the king's cupbearer (the servant who served the wine) | Today: a household manager
+dearth | archaic | famine; a shortage of food
+broidered | archaic | embroidered
+ouches | archaic | settings for gemstones
+ensign | archaic | a banner; signal flag
+vesture | archaic | clothing; a garment
+emerods | archaic | hemorrhoids; painful swellings
+straitened | archaic | restricted; made narrow
+pastors | archaic | shepherds (of a flock, or of people)
+tares | archaic | weeds that look like wheat
+edify, edifying, edification | archaic | build up (in faith); encourage
+provender | archaic | fodder; feed for animals
+pottage | archaic | a thick soup or stew
+ringstraked | archaic | striped
+beeves | archaic | cattle; oxen
+revenger | archaic | one who avenges a death
+scrip | archaic | a small bag for carrying food
+sunder | archaic | tear apart; separate
+dwellingplace, dwellingplaces | archaic | a place to live
+savoury | archaic | tasty (food)
+subtil, subtilty, subtilly | archaic | crafty; cunning; craftiness
+bonnets | archaic | headbands; turbans
+talebearer | archaic | a gossip
+rereward | archaic | rear guard
+caldron | archaic | a large cooking pot
+bolster | archaic | pillow
+porter, porters | changed | doorkeeper; gatekeeper | Today: a person who carries luggage
+navy | archaic | a fleet of ships
+drams | unit | a gold coin (the Persian daric)
+goodman | archaic | the master of the house
+cankerworm | archaic | a locust larva; a destructive caterpillar
+mote | archaic | a speck; a tiny particle
+lasciviousness | archaic | shameless, unrestrained lust
+eventide | archaic | evening
+endued | archaic | clothed; given (power)
+traffick | archaic | trade; business
+matrix | archaic | womb
+timbrel, tabret, tabrets | archaic | a small hand drum; tambourine
+dam | archaic | the mother of an animal
+fleshhooks | archaic | forks for lifting meat
+breeches | archaic | linen undergarments; trousers
+rump | archaic | the fat tail (of a sheep)
+oblations | archaic | offerings given to God
+blasting | archaic | crop disease caused by scorching wind
+straitness | archaic | distress; narrowness
+oliveyards | archaic | olive groves
+parlour | archaic | a room in a house (a cool upper room)
+athirst | archaic | thirsty
+founder | archaic | a metalworker who casts metal
+lucre | archaic | money; gain (often dishonest gain)
+chargeable | archaic | a burden; costly
+passengers | changed | travellers; people passing by | Today: people riding a vehicle
+firebrands | archaic | burning sticks; torches
+withs | archaic | fresh cords; strong bowstrings
+tow | archaic | coarse flax fibre
+coffer | archaic | a chest; a box
+target, targets | archaic | a small shield
+succour | archaic | help; aid
+pulse | archaic | seeds and vegetables (peas, beans, lentils)
+dromedaries | archaic | fast riding camels
+barrel | changed | a jar; pitcher | Today: a wooden cask
+plummet | archaic | a plumb line; a weight on a line
+overflown | archaic | flooded
+tillage | archaic | cultivated farmland
+pommels | archaic | rounded bowls or tops (on pillars)
+enjoined | archaic | commanded
+naughtiness | archaic | wickedness
+whorish | archaic | of a prostitute
+prating | archaic | chattering foolishly
+extortioner, extortioners | archaic | someone who takes money by force or threats
+pruninghooks | archaic | tools for trimming vines
+cockatrice | archaic | a venomous snake, probably a viper
+palmerworm | archaic | a kind of locust larva
+tinkling | archaic | jingling
+visage | archaic | face
+teats | archaic | breasts
+paps | archaic | breasts
+solemnities | archaic | solemn festivals
+amber | archaic | a shining metal (electrum), not the yellow resin
+despiteful | archaic | spiteful; full of contempt
+bushel | unit | a basket or container for grain
+farthing | unit | a small Roman coin, worth a fraction of a day's pay
+penny, pence | unit | a Roman denarius, about a day's pay for a labourer
+mite, mites | unit | the smallest Greek coin, worth almost nothing
+receipt | archaic | a place for receiving payment ("receipt of custom" = tax office)
+bridechamber | archaic | the wedding chamber ("children of the bridechamber" = wedding guests)
+unwashen | archaic | unwashed
+pretence | archaic | pretext; a show put on to hide the real reason
+napkin | changed | a cloth; handkerchief | Today: a table napkin
+malefactors | archaic | criminals
+gainsaying | archaic | speaking against; opposition
+propitiation | archaic | the atoning sacrifice that turns away God's anger
+concupiscence | archaic | strong (sinful) desire; lust
+highminded | archaic | proud; arrogant
+ensample, ensamples | archaic | example
+reprobates, reprobate | archaic | people who fail the test; rejected
+unfeigned | archaic | genuine; sincere
+replenish | changed | fill | Today: refill; top up
+artificer | archaic | a skilled craftsman
+asswaged | archaic | eased; calmed
+slime | changed | tar; bitumen | Today: sticky ooze
+sporting | archaic | caressing; playing
+pilled | archaic | peeled
+strakes | archaic | stripes
+merchantmen | archaic | traders
+espied | archaic | saw; spotted
+tenor | archaic | the content; the wording
+mess | changed | a portion of food | Today: a disorder
+earing | archaic | ploughing
+blains | archaic | boils; sores
+ingathering | archaic | the harvest
+selvedge | archaic | the edge of a piece of cloth
+coney | changed | rock badger (hyrax) | Today: rabbit
+ossifrage | archaic | a large bird of prey, perhaps the bearded vulture
+gier | archaic | a kind of vulture ("gier eagle")
+scurvy | changed | an itchy, scabby skin disease | Today: a disease from lack of vitamin C
+advertise | changed | inform; warn | Today: promote a product
+botch | archaic | a boil; ulcer
+adventure | archaic | to risk; venture
+habergeon | archaic | a coat of mail; armour for the chest
+clovenfooted | archaic | with split hooves
+turtle, turtles | changed | turtledove | Today: the reptile
+poll, polled | changed | head; to cut the hair | Today: an opinion survey
+gin | changed | a trap; snare | Today: the drink
+dart, darts | archaic | a javelin; arrow
+silly | changed | simple; weak-minded; easily led astray | Today: foolish in a lighthearted way
+
+# ---- False friends: familiar words with a different KJV meaning -------------------------------
+ prevent, prevented, preventest | changed | go before; come ahead of; meet | Today: stop something from happening
+ conversation | changed | conduct; way of life; behaviour | Today: a talk
+charity | changed | love; selfless love for others | Today: giving to the poor
+meat, meats | changed | food of any kind | Today: the flesh of an animal
+corn | changed | grain (wheat, barley) | Today: maize, or sweet corn
+fowl, fowls | changed | bird; birds of any kind | Today: chicken
+leasing | archaic | lying; falsehood
+quick | changed | alive; living | Today: fast
+coast, coasts | changed | region; territory; border | Today: the seashore
+bowels | changed | the inner parts; the seat of pity and compassion | Today: the intestines
+reins | changed | kidneys; the innermost feelings | Today: straps for guiding a horse
+carriage, carriages | changed | baggage; the things carried | Today: a horse-drawn vehicle
+occupy, occupied, occupieth, occupiers | changed | do business; trade; the traders | Today: fill a space, or take over
+nephew, nephews | changed | grandson; descendant | Today: a brother's or sister's son
+artillery | changed | weapons (a bow and arrows) | Today: heavy guns
+bruit | archaic | a report; rumour; noise
+clouted | archaic | patched
+cunning, cunningly | changed | skilled; skilfully made; skill | Today: sly
+delicate, delicately | changed | pampered; refined; luxurious | Today: fragile
+emulation, emulations | changed | jealous rivalry; the wish to outdo others | Today: imitation
+hardly | changed | with difficulty; harshly | Today: barely
+honest | changed | honourable; respectable; upright | Today: truthful
+lust, lusts, lusted, lusteth, lusting | changed | strong desire; craving (not always sexual) | Today: sexual desire
+ mansions | changed | a place to live; a room | Today: a large house
+ mortify | changed | put to death; deaden | Today: embarrass
+outlandish | archaic | foreign
+pitiful | changed | full of pity; compassionate | Today: pathetic
+publican, publicans | changed | a tax collector | Today: the keeper of a pub
+spoil, spoiled, spoileth, spoiling | changed | plunder; loot; to plunder | Today: ruin
+stranger, strangers | changed | a foreigner; an outsider | Today: someone you don't know
+ testament | changed | covenant; agreement | Today: a will, or a part of the Bible
+usury | changed | interest on a loan (any interest) | Today: excessive interest
+want, wanted, wanteth, wanting | changed | lack; need; be without | Today: desire
+travail, travailed, travaileth | changed | hard labour; toil; birth pains | Today: a journey
+mischief, mischiefs | changed | harm; evil; trouble | Today: playful misbehaviour
+murmur, murmured, murmuring, murmurings, murmurers | changed | grumble; complain | Today: a soft sound
+convenient | changed | fitting; proper | Today: easy or handy
+compass, compassed, compassest, compasseth, compassing | changed | go around; surround; a circuit | Today: the direction-finding instrument
+curious, curiously | changed | skilfully made; intricate | Today: inquisitive
+deputy, deputies | changed | a governor; proconsul | Today: an assistant
+cleave, cleaveth, cleaved, clave | changed | cling; stay close (sometimes: to split) | Today: to split
+dress, dressed, dresseth, dresser | changed | prepare; tend (a garden, lamps); cook (food) | Today: put on clothes
+heaviness | changed | sorrow; grief | Today: weight
+issue, issues | changed | a bodily flow or discharge; offspring | Today: a topic or problem
+liberal | changed | generous | Today: broad-minded, or a political label
+lunatick | changed | someone with seizures (epilepsy) | Today: a mad person
+candle, candles | changed | a lamp (burning oil) | Today: a wax candle
+candlestick, candlesticks | changed | a lampstand | Today: a holder for a candle
+crib | changed | a manger; a feeding trough | Today: a baby's bed
+suburbs | changed | the pasture lands around a town | Today: a residential area outside a city
+duke, dukes | changed | a tribal chief (of Edom) | Today: a nobleman
+vocation | changed | calling; the life God calls a person to | Today: a job
+stomacher | archaic | a fancy garment worn over the chest
+wench | changed | a young woman servant | Today: (now a coarse word)
+brasen | archaic | made of brass (bronze)
+tortoise | changed | a large lizard | Today: the land turtle
+nurture | archaic | training; discipline
+overcharge, overcharged | archaic | weigh down; burden
+overplus | archaic | a surplus; what is left over
+importunity | archaic | persistence; refusal to give up
+guile | archaic | deceit; trickery
+goodly | archaic | fine; handsome; excellent
+grievous | archaic | severe; hard; painful
+concourse | archaic | a crowd; a noisy gathering
+husbandry | archaic | farming; a field being farmed
+jot | archaic | the smallest letter; a tiny detail
+tittle | archaic | a tiny mark on a letter
+mammon | archaic | wealth; money (treated as an idol)
+principality, principalities | archaic | a ruler; a ruling power
+secondarily | archaic | in the second place
+shamefacedness | archaic | modesty; a sense of shame
+sleight | archaic | trickery; cunning
+sottish | archaic | foolish
+swaddling, swaddled | archaic | wrapped tightly in strips of cloth
+tackling | archaic | ropes; a ship's rigging
+ taskmasters | archaic | slave drivers; overseers of forced labour
+taxing, taxed | changed | a census; registering | Today: charging a tax
+trump | archaic | trumpet
+unction | archaic | anointing
+uttermost | archaic | farthest; most distant; complete
+winebibber | archaic | a heavy drinker
+verity | archaic | truth
+vintage | archaic | the grape harvest
+wayfaring | archaic | travelling; on a journey
+wimples | archaic | shawls; cloaks
+winefat | archaic | the vat in which grapes are trodden
+hoised | archaic | hoisted
+purloining | archaic | stealing
+purtenance | archaic | the inner organs of an animal
+quaternions | archaic | squads of four soldiers
+ravening | archaic | preying; plundering
+sheepcote | archaic | a sheepfold; a pen for sheep
+sith | archaic | since
+sojourn, sojourned, sojourner, sojourners, sojourneth, sojourning | archaic | live for a time as a foreigner
+solace | archaic | comfort; to comfort
+spikenard | archaic | an expensive perfume from a mountain plant
+stripling | archaic | a youth; a young man
+surety, sureties | archaic | a guarantor; a guarantee ("of a surety" = for certain)
+ tattlers | archaic | a gossip
+sackbut | archaic | an ancient musical instrument
+mattock | archaic | a digging tool, like a pickaxe
+maw | archaic | the stomach
+mincing | archaic | walking with short, affected steps
+murrain | archaic | a deadly disease of livestock
+nitre | archaic | soda; a cleaning mineral
+pavilion, pavilions | archaic | a tent; a canopy
+descry | archaic | spy out; catch sight of
+ diadem | archaic | a crown; a royal headband
+daysman | archaic | a mediator; an umpire
+ cumbered, cumbereth | archaic | burden; distract; use up
+ensue | archaic | pursue; go after
+fatlings | archaic | fattened animals
+flux | archaic | dysentery
+forbear, forbearing, forbeareth | archaic | hold back; refrain; put up with
+forasmuch | archaic | since; because
+garner, garners | archaic | a storehouse for grain
+gainsay | archaic | contradict; oppose
+glistering | archaic | glittering
+ hale | archaic | drag by force
+hallow, hallowed | archaic | make holy; treat as holy
+loins | archaic | the waist and hips; also, the source of offspring
+mar, marred | archaic | spoil; damage
+bulwarks | archaic | defensive walls; ramparts
+chambering | archaic | sexual immorality
+chapiter, chapiters | archaic | the capital (the decorated top) of a pillar
+ephod | archaic | a sacred linen garment worn by priests
+ phylacteries | archaic | small boxes holding Scripture, worn on the forehead and arm
+lees | archaic | the dregs; sediment of wine
+lovingkindness, lovingkindnesses | archaic | steadfast, faithful love
+noisome | archaic | harmful; foul
+privy | archaic | secret; private
+gross | changed | thick; dense ("gross darkness") | Today: disgusting
+sop | archaic | a piece of bread dipped in a dish
+communicate | changed | share | Today: pass on information
+organ, organs | changed | a wind instrument; a pipe | Today: a body part, or a keyboard instrument
+flags | changed | reeds; water plants | Today: banners
+backside | changed | the far side; the back | Today: the rear end
+apt | changed | able; skilled | Today: likely; suitable
+honestly | changed | properly; decently | Today: truthfully
+seduce, seduced | changed | lead astray | Today: tempt into sex
+
+# ---- Words that keep their modern meaning almost everywhere: applied only in the verses listed --
+let | changed | hinder; stop; prevent | Today: allow | @ Exodus 5:4; Isaiah 43:13; Romans 1:13; 2 Thessalonians 2:7
+suffer, suffered, suffereth, sufferest, suffering | changed | allow; permit; put up with | Today: endure pain | @ Genesis 20:6; Genesis 31:7; Genesis 31:28; Exodus 12:23; Exodus 22:18; Leviticus 2:13; Leviticus 19:17; Leviticus 22:16; Numbers 21:23; Deuteronomy 8:3; Deuteronomy 18:14; Joshua 10:19; Judges 1:34; Judges 3:28; Judges 15:1; Judges 16:26; 1 Samuel 24:7; 2 Samuel 14:11; 2 Samuel 21:10; 1 Kings 15:17; 1 Chronicles 16:21; Esther 3:8; Job 9:18; Job 21:3; Job 31:30; Job 36:2; Psalms 16:10; Psalms 55:22; Psalms 66:9; Psalms 89:33; Psalms 101:5; Psalms 105:14; Psalms 107:38; Psalms 121:3; Proverbs 10:3; Ecclesiastes 5:6; Ecclesiastes 5:12; Ezekiel 44:20; Matthew 3:15; Matthew 8:21; Matthew 8:31; Matthew 17:17; Matthew 19:8; Matthew 19:14; Matthew 23:13; Matthew 24:43; Mark 1:34; Mark 5:19; Mark 5:37; Mark 7:12; Mark 9:19; Mark 10:4; Mark 10:14; Mark 11:16; Luke 4:41; Luke 8:32; Luke 8:51; Luke 9:41; Luke 9:59; Luke 12:39; Luke 18:16; Luke 22:51; Acts 2:27; Acts 13:18; Acts 13:35; Acts 14:16; Acts 16:7; Acts 19:30; Acts 21:39; Acts 27:7; Acts 28:4; Acts 28:16; 1 Corinthians 6:7; 1 Corinthians 10:13; 2 Corinthians 11:19; 2 Corinthians 11:20; 1 Timothy 2:12; Hebrews 7:23; Hebrews 13:22; Revelation 2:20; Revelation 11:9
+meet | changed | fitting; proper; suitable | Today: come together with | @ Genesis 2:18; Genesis 2:20; Exodus 8:26; Deuteronomy 3:18; Judges 5:30; Ezra 4:14; Esther 2:9; Job 34:31; Proverbs 11:24; Jeremiah 26:14; Jeremiah 27:5; Ezekiel 15:4; Ezekiel 15:5; Matthew 3:8; Matthew 15:26; Mark 7:27; Luke 15:32; Acts 26:20; Romans 1:27; 1 Corinthians 15:9; 1 Corinthians 16:4; Philippians 1:7; Colossians 1:12; 2 Thessalonians 1:3; 2 Timothy 2:21; Hebrews 6:7; 2 Peter 1:13
+wealth | changed | well-being; welfare | Today: riches | @ Ezra 9:12; Esther 10:3; 1 Corinthians 10:24
+press | changed | a crowd | Today: newspapers; to push | @ Mark 2:4; Mark 5:27; Mark 5:30; Luke 8:19; Luke 19:3
+press | archaic | a winepress, where grapes are trodden | | @ Joel 3:13; Haggai 2:16
+post, posts | changed | a courier; a runner | Today: mail; a pole | @ 2 Chronicles 30:6; 2 Chronicles 30:10; Esther 3:13; Esther 3:15; Esther 8:10; Esther 8:14; Job 9:25; Jeremiah 51:31
+pitch | changed | tar; to coat with tar (to make waterproof) | Today: to throw, or to set up a tent | @ Genesis 6:14; Exodus 2:3; Isaiah 34:9
+virtue | changed | power; healing strength | Today: moral goodness | @ Mark 5:30; Luke 6:19; Luke 8:46
+earnest | changed | a down payment; a guarantee of what is to come | Today: serious | @ 2 Corinthians 1:22; 2 Corinthians 5:5; Ephesians 1:14
+study, studieth | changed | make it your ambition; work hard at; think carefully about | Today: read for a course | @ Proverbs 15:28; Proverbs 24:2; 1 Thessalonians 4:11; 2 Timothy 2:15
+mean | changed | of low rank; ordinary; unimportant | Today: unkind | @ Proverbs 22:29; Isaiah 2:9; Isaiah 5:15; Isaiah 31:8; Acts 21:39
+instant | changed | insistent; persistent; urgent | Today: immediate | @ Luke 23:23; Romans 12:12; 2 Timothy 4:2
+instantly | changed | earnestly; urgently | Today: immediately | @ Luke 7:4; Acts 26:7
+heavy | changed | deeply distressed; sorrowful | Today: weighing a lot | @ Matthew 26:37; Mark 14:33
+vile | changed | lowly; humble | Today: disgusting | @ Philippians 3:21
+rude | changed | untrained; unskilled | Today: impolite | @ 2 Corinthians 11:6
+gay | changed | fine; showy | | @ James 2:3
+witty | changed | clever; shrewd | Today: amusing | @ Proverbs 8:12
+tired | archaic | adorned; dressed (her hair) | Today: weary | @ 2 Kings 9:30
+tire, tires | archaic | a headdress; an ornamental head covering | | @ Isaiah 3:18; Ezekiel 24:17; Ezekiel 24:23
+log | unit | a liquid measure, about a third of a litre | | @ Leviticus 14:10; Leviticus 14:12; Leviticus 14:15; Leviticus 14:21; Leviticus 14:24
+
+# ---- Phrases ---------------------------------------------------------------------------------
+take no thought, take thought, taking thought | changed | do not worry; be anxious | Today: to think
+to wit | archaic | that is to say; namely
+god forbid | archaic | certainly not; may it never be
+be of good cheer | archaic | take courage; do not be afraid
+gave up the ghost, give up the ghost, given up the ghost, giveth up the ghost, yielded up the ghost | archaic | died; breathed his last
+ bare record, bear record, bearest record | archaic | testified; gave testimony
+fetch a compass, fetched a compass | archaic | go around; take an indirect route
+strange woman, strange women | archaic | a foreign woman; in Proverbs, an adulteress | Today: an odd woman
+ strange wives | archaic | foreign wives | Today: odd wives
+strange gods, strange god | archaic | foreign gods | Today: odd gods
+strange fire | archaic | fire not commanded by God; unauthorised fire
+strange land | archaic | a foreign land
+strange children | archaic | foreign children
+meat offering, meat offerings | changed | a grain offering (flour, oil and incense, with no meat) | Today: an offering of animal flesh
+tenth deal, tenth deals | archaic | one tenth of an ephah (of flour)
+mercy seat | archaic | the gold cover of the ark, where atonement was made
+ trespass offering | archaic | an offering to make amends for a wrong; a guilt offering
+
+# ---- Old measures, weights and coins -----------------------------------------------------------
+cubit, cubits | unit | about 18 inches (45 cm): the length from the elbow to the fingertips
+span | unit | about 9 inches (23 cm): the width of a spread hand
+ handbreadth | unit | about 3 inches (8 cm): the width of a hand
+ephah | unit | about 22 litres, a dry measure (roughly two-thirds of a bushel)
+homer | unit | about 220 litres, a dry measure (ten ephahs)
+omer | unit | about 2 litres, a dry measure (a tenth of an ephah)
+bath, baths | unit | about 22 litres, a liquid measure
+hin | unit | about 4 litres, a liquid measure
+shekel, shekels | unit | about 11 grams (0.4 oz): a weight of silver or gold
+bekah | unit | half a shekel
+talent, talents | unit | about 34 kg (75 lb): a very large weight of silver or gold | Today: a natural ability
+ furlongs | unit | about 200 metres (an eighth of a mile)
+ firkins | unit | about 40 litres, a liquid measure
+
+# ---- Old animals, places and things ------------------------------------------------------------
+bullock, bullocks | archaic | a young bull; an ox
+ass, asses | archaic | donkey; donkeys
+kine | archaic | cattle; cows
+sepulchre, sepulchres | archaic | a tomb; a burial place
+asp, asps | archaic | a venomous snake
+cockatrices | archaic | venomous snakes, probably vipers
+pygarg | archaic | a kind of antelope
+unicorn, unicorns | changed | a wild ox (the aurochs) | Today: the mythical horse with a horn
+selah | archaic | a pause or musical marker in the Psalms; its exact meaning is uncertain
+hitherto | archaic | until now; up to this point
+vail | archaic | veil; the curtain (as in the temple)
+
+# ==== Second pass: changed meanings, audited against the verses ==================================
+# Corrected or widened entries from the first pass.
+lively | changed | living ("lively stones" = living stones) | Today: full of energy | @ Acts 7:38; 1 Peter 1:3; 1 Peter 2:5
+gender | changed | produce; breed; mate | Today: a person's sex or identity
+halt | changed | lame; limping; to limp or waver ("the halt" = the lame) | Today: stop
+lewd | changed | wicked; shameless; worthless | Today: indecent
+harness | changed | armour; weapons | Today: straps for a horse | @ 1 Kings 20:11; 1 Kings 22:34; 2 Chronicles 9:24; 2 Chronicles 18:33
+bottle, bottles | changed | a container for liquids, usually made of animal skin | Today: a glass or plastic bottle
+strait | changed | narrow; cramped; also, a tight spot or distress ("strait gate" = narrow gate) | Today: straight
+quit | changed | act; behave ("quit you like men"); also, free or released | Today: give up
+careful, carefulness | changed | anxious; concerned | Today: cautious
+
+# Familiar words that meant something else.
+ignorant, ignorance, ignorantly | changed | unaware; uninformed; without knowledge (not stupid or rude) | Today: rude or stupid
+imagine, imagined, imagineth, imagination, imaginations | changed | plan; scheme; devise (an "imagination" is a thought or inclination of the heart) | Today: picture in the mind
+impotent | changed | sick; disabled; without strength | Today: powerless
+ infidel | changed | an unbeliever; someone without faith | Today: an enemy of a religion
+entertain | changed | welcome as a guest; show hospitality to | Today: amuse
+convince, convinced, convinceth | changed | prove wrong; refute; show to be guilty | Today: persuade
+condescend | changed | associate with; be willing to stay with (someone of low position) | Today: talk down to
+novice | changed | a new convert; someone new to the faith | Today: a beginner
+ pilgrims, pilgrimage | changed | a foreigner passing through; a temporary resident (life as a journey) | Today: a traveller to a holy place
+publish, published, publisheth | changed | announce; make known; spread the news | Today: print and sell a book
+purge, purged, purgeth, purging | changed | cleanse; purify; prune | Today: get rid of people
+riot, riotous, rioting | changed | wild, reckless living; wasteful excess | Today: a violent public disturbance
+ salute, saluted, saluteth, salutation, salutations | changed | greet; a greeting | Today: a military gesture
+simple | changed | naive; inexperienced; gullible (sometimes: innocent) | Today: easy or plain
+simplicity | changed | sincerity; single-hearted honesty | Today: plainness
+substance | changed | possessions; property; wealth ("substance of things hoped for" = assurance) | Today: material; something solid
+terrible, terribly, terribleness | changed | awe-inspiring; to be feared; fearsome | Today: very bad
+token, tokens | changed | a sign; proof; evidence | Today: a small coin or marker
+translate, translated | changed | transfer; move from one place to another | Today: turn into another language
+venison | changed | meat from a hunted wild animal | Today: deer meat
+visit, visited, visiteth, visitation | changed | come to help, care for, or judge (of God: to step in, to bless or to punish) | Today: pay a social call
+mistress | changed | the woman in charge of a household or of servants | Today: a man's lover
+manifold | archaic | many; of many kinds; many times over
+devils | changed | demons; evil spirits | Today: the Devil (Satan), a single being
+prove, proved, proveth, proving | changed | test; try out (also: show to be true) | Today: show that something is true
+tempt, tempted, tempteth, tempting, temptation, temptations, tempter | changed | test; put to the proof (also: entice to sin) | Today: lure into doing wrong
+communication, communications | changed | talk; conversation; speech | Today: a message or contact
+potentate | archaic | a ruler; sovereign
+ presidents | changed | a high official; a chief administrator | Today: the head of a country
+untoward | archaic | crooked; perverse
+upbraid, upbraided, upbraideth | archaic | scold; reproach; find fault with
+ savour, savours | archaic | smell; aroma (also: flavour)
+frontlets | archaic | bands worn on the forehead
+familiar spirit, familiar spirits | archaic | a spirit consulted by a medium; a spirit said to give secret knowledge
+
+# Phrases whose words look ordinary but mean something else.
+i pray thee, i pray you, we pray thee, we pray you, pray thee, pray you | archaic | please; I ask you (not a prayer to God) | Today: to speak to God
+jealous god | changed | a God who guards his relationship with his people and will not share their loyalty | Today: envious
+respect of persons, respecter of persons, respect to persons | changed | favouritism; treating people differently because of their status | Today: regard for others
+ had respect unto, have respect unto, have respect to | changed | look on with favour; pay attention to | Today: admire
+god speed | archaic | a greeting that wishes someone success
+good speed | archaic | success; a good outcome
+evil communications corrupt good manners | changed | bad company ruins good character | Today: rude messages spoil politeness
+tables of stone, tables of the covenant, tables of testimony, tables of the testimony, table of thine heart, fleshy tables of the heart | changed | flat slabs for writing on; tablets | Today: furniture
+
+# Familiar words that changed meaning in only some verses: applied just where the KJV sense is meant.
+knew, known, know | changed | had marital relations with (a polite expression) | Today: was acquainted with | @ Genesis 4:1; Genesis 4:17; Genesis 4:25; Genesis 19:8; Genesis 24:16; Genesis 38:26; Numbers 31:17; Numbers 31:18; Numbers 31:35; Judges 11:39; Judges 19:25; Judges 21:12; 1 Samuel 1:19; 1 Kings 1:4; Matthew 1:25; Luke 1:34
+whole | changed | healed; healthy; restored to health | Today: complete | @ Joshua 5:8; Job 5:18; Jeremiah 19:11; Matthew 9:12; Matthew 9:21; Matthew 9:22; Matthew 15:28; Matthew 15:31; Mark 2:17; Mark 5:28; Mark 5:34; Mark 6:56; Mark 10:52; Luke 5:31; Luke 8:48; Luke 8:50; Luke 17:19; John 5:4; John 5:6; John 5:9; John 5:14; John 5:15; Acts 4:9; Acts 9:34
+clean | changed | completely; entirely | Today: not dirty | @ Leviticus 23:22; Joshua 3:17; Joshua 4:1; Joshua 4:11; Psalms 77:8; Isaiah 24:19; 2 Peter 2:18
+common | changed | shared by all; held in common | Today: usual | @ Acts 2:44; Acts 4:32; Titus 1:4; Jude 1:3
+common | changed | ordinary; not set apart as holy; ritually unclean | Today: usual | @ 1 Samuel 21:4; 1 Samuel 21:5; Acts 10:14; Acts 10:15; Acts 10:28; Acts 11:8; Acts 11:9
+glass, glasses | changed | a mirror (of polished metal) | Today: the transparent material | @ Job 37:18; Isaiah 3:23; 1 Corinthians 13:12; 2 Corinthians 3:18; James 1:23
+grudge, grudging, grudgingly | changed | grumble; complain; (grudgingly) reluctantly | Today: resentment held against someone | @ Psalms 59:15; 2 Corinthians 9:7; James 5:9; 1 Peter 4:9
+passion, passions | changed | suffering; also, nature or feelings ("of like passions" = of the same nature) | Today: strong emotion | @ Acts 1:3; Acts 14:15; James 5:17
+mark | changed | a target; a goal | Today: a sign or stain | @ 1 Samuel 20:20; Job 7:20; Job 16:12; Lamentations 3:12; Philippians 3:14
+mark | changed | notice; pay careful attention to; take note of | Today: make a sign on something | @ Ruth 3:4; 2 Samuel 13:28; 1 Kings 20:7; 1 Kings 20:22; Job 18:2; Job 21:5; Job 33:31; Job 39:1; Psalms 37:37; Psalms 48:13; Psalms 56:6; Psalms 130:3; Ezekiel 44:5; Romans 16:17; Philippians 3:17
+natural | changed | of ordinary human nature, without the Spirit; physical | Today: normal; organic | @ 1 Corinthians 2:14; 1 Corinthians 15:44; 1 Corinthians 15:46
+sense | changed | the meaning | Today: a feeling or ability | @ Nehemiah 8:8
+title | changed | an inscription; a marker with writing on it | Today: a name or rank | @ 2 Kings 23:17; John 19:19; John 19:20
+painful | changed | wearisome; troublesome | Today: hurting | @ Psalms 73:16
+moderation | changed | gentleness; a reasonable, forbearing spirit | Today: restraint | @ Philippians 4:5
+wink, winked | changed | overlook; ignore | Today: close one eye briefly | @ Acts 17:30
+tale | changed | a count; a number | Today: a story | @ Exodus 5:8; Exodus 5:18; 1 Samuel 18:27; 1 Chronicles 9:28
+ offend | changed | cause to stumble; cause to sin | Today: insult or upset | @ Matthew 5:29; Matthew 5:30; Matthew 13:41; Matthew 17:27; Matthew 18:6; Matthew 18:8; Matthew 18:9; Mark 9:42; Mark 9:43; Mark 9:45; Mark 9:47; Luke 17:2; John 6:61; 1 Corinthians 8:13
+offended | changed | caused to stumble; fell away from faith; took offence | Today: upset | @ Matthew 11:6; Matthew 13:21; Matthew 13:57; Matthew 24:10; Matthew 26:31; Matthew 26:33; Mark 4:17; Mark 6:3; Mark 14:27; Mark 14:29; Luke 7:23; John 16:1; Romans 14:21; 2 Corinthians 11:29
+ thy seed, his seed, her seed, my seed, their seed, your seed | changed | descendants; offspring | Today: what a plant grows from | @! Leviticus 26:16; Deuteronomy 11:10; Deuteronomy 14:22; Deuteronomy 22:9; Ecclesiastes 11:6; Isaiah 17:11; Isaiah 30:23; Luke 8:5; 2 Corinthians 9:10
+ought | changed | anything | Today: should | @ Genesis 39:6; Genesis 47:18; Exodus 5:8; Exodus 5:11; Exodus 5:19; Exodus 12:46; Exodus 22:14; Exodus 29:34; Leviticus 11:25; Leviticus 19:6; Leviticus 25:14; Leviticus 27:31; Numbers 15:24; Numbers 15:30; Numbers 30:6; Deuteronomy 4:2; Deuteronomy 15:2; Deuteronomy 26:14; Joshua 21:45; Ruth 1:17; 1 Samuel 12:4; 1 Samuel 12:5; 1 Samuel 25:7; 1 Samuel 30:22; 2 Samuel 3:35; 2 Samuel 14:10; 2 Samuel 14:19; Matthew 5:23; Matthew 21:3; Mark 7:12; Mark 8:23; Mark 11:25; John 4:33; Acts 4:32; Acts 28:19; Philemon 1:18
+gerahs | unit | a twentieth of a shekel
+tidings | archaic | news; a report
+sore afraid, sore displeased, sore vexed, sore distressed, sore troubled, sore amazed, sore pained, sore confounded, sore athirst | changed | very; greatly ("sore afraid" = very afraid) | Today: painful
+peculiar | changed | belonging especially to one owner; treasured | Today: strange
+ confound, confounded | changed | put to shame; defeat; throw into confusion | Today: puzzle
+discover, discovered, discovereth | changed | uncover; reveal; expose | Today: find out
+ vex, vexed | changed | trouble; harass; torment | Today: annoy
+offence, offences | changed | a stumbling block; a cause of sin; a wrong done | Today: an insult, or a crime
+surname, surnamed | changed | an additional name; also called (not a family name) | Today: a family name
+nativity | archaic | birth; origin
+whoredom, whoredoms, whoring | archaic | prostitution; often, unfaithfulness to God (worshipping idols)
+
+without | changed | outside; on the outside ("them that are without" = those outside the church) | Today: lacking; not having | @ Genesis 6:14; Genesis 9:22; Genesis 19:16; Genesis 24:11; Genesis 24:31; Exodus 25:11; Exodus 29:14; Exodus 33:7; Exodus 37:2; Leviticus 4:12; Leviticus 4:21; Leviticus 6:11; Leviticus 8:17; Leviticus 9:11; Leviticus 13:46; Leviticus 13:55; Leviticus 14:40; Leviticus 14:41; Leviticus 16:27; Leviticus 24:14; Numbers 5:3; Numbers 5:4; Numbers 15:35; Numbers 15:36; Numbers 19:3; Numbers 19:9; Numbers 31:13; Numbers 31:19; Numbers 35:5; Numbers 35:26; Numbers 35:27; Deuteronomy 23:12; Deuteronomy 25:5; Deuteronomy 32:25; Joshua 6:23; 1 Kings 6:6; 1 Kings 6:29; 1 Kings 6:30; 1 Kings 7:9; 1 Kings 8:8; 2 Kings 10:24; 2 Kings 16:18; 2 Kings 23:4; 2 Kings 23:6; 2 Chronicles 5:9; 2 Chronicles 32:3; 2 Chronicles 32:5; 2 Chronicles 33:14; Ezra 10:13; Nehemiah 13:20; Psalms 31:11; Proverbs 1:20; Proverbs 7:12; Proverbs 22:13; Proverbs 24:27; Song of Solomon 8:1; Isaiah 33:7; Jeremiah 9:21; Jeremiah 21:4; Ezekiel 2:10; Ezekiel 7:15; Ezekiel 40:19; Ezekiel 40:40; Ezekiel 41:9; Ezekiel 41:17; Ezekiel 41:25; Ezekiel 42:7; Ezekiel 43:21; Ezekiel 46:2; Ezekiel 47:2; Hosea 7:1; Matthew 12:46; Matthew 12:47; Matthew 26:69; Mark 1:45; Mark 3:31; Mark 3:32; Mark 4:11; Mark 11:4; Luke 8:20; Luke 11:40; Luke 13:25; John 18:16; Acts 5:23; 1 Corinthians 5:12; 1 Corinthians 5:13; 2 Corinthians 7:5; 2 Corinthians 11:28; Colossians 4:5; 1 Thessalonians 4:12; 1 Timothy 3:7; Hebrews 13:11; Hebrews 13:12; Hebrews 13:13; Revelation 11:2; Revelation 14:20; Revelation 22:15
+from without | changed | from outside | Today: from lacking

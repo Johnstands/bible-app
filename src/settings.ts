@@ -1,5 +1,15 @@
 import { loadJson, saveJson } from "./storage";
 
+export const WORD_HELP_LEVELS = ["off", "changed", "all"] as const;
+/** How much to underline: nothing, only words whose meaning has changed, or archaic words and measures too. */
+export type WordHelpLevel = (typeof WORD_HELP_LEVELS)[number];
+
+export const WORD_HELP_LABELS: Record<WordHelpLevel, string> = {
+  off: "Off",
+  changed: "Changed meanings",
+  all: "All words",
+};
+
 export const THEMES = ["paper", "sepia", "dark"] as const;
 export type Theme = (typeof THEMES)[number];
 
@@ -26,6 +36,8 @@ export interface Settings {
   pilcrows: boolean;
   /** Show the verse of the day when the app opens, once a day. */
   verseOfTheDay: boolean;
+  /** Underline words that are archaic or meant something else in 1611; click one for its meaning. */
+  wordHelp: WordHelpLevel;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -35,12 +47,19 @@ export const DEFAULT_SETTINGS: Settings = {
   verseByVerse: false,
   pilcrows: false,
   verseOfTheDay: true,
+  wordHelp: "all",
 };
 
 /** Rounds to the nearest step and keeps the size within range. */
 export function clampScale(n: number): number {
   const stepped = Math.round(n / FONT_SCALE.step) * FONT_SCALE.step;
   return Math.round(Math.min(FONT_SCALE.max, Math.max(FONT_SCALE.min, stepped)) * 100) / 100;
+}
+
+/** Reads a stored word-help level, including the on/off value it had before it had levels. */
+function sanitizeWordHelp(v: unknown): WordHelpLevel | null {
+  if (typeof v === "boolean") return v ? "all" : "off";
+  return WORD_HELP_LEVELS.includes(v as WordHelpLevel) ? (v as WordHelpLevel) : null;
 }
 
 /**
@@ -59,6 +78,7 @@ export function sanitizeSettings(raw: unknown, legacyTheme?: unknown): Settings 
     verseByVerse: typeof r.verseByVerse === "boolean" ? r.verseByVerse : d.verseByVerse,
     pilcrows: typeof r.pilcrows === "boolean" ? r.pilcrows : d.pilcrows,
     verseOfTheDay: typeof r.verseOfTheDay === "boolean" ? r.verseOfTheDay : d.verseOfTheDay,
+    wordHelp: sanitizeWordHelp(r.wordHelp) ?? d.wordHelp,
   };
 }
 

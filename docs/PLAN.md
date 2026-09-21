@@ -56,6 +56,15 @@
   - **Data:** `user.db` migrates in place (version 2 adds note ranges and one note per verse), with Rust tests for each behavior including the upgrade.
 - **Follow-ups for Phase 6:** verses can only be selected with the mouse, so selection needs a keyboard path; the Library needs a screen-reader pass.
 
+## Word help (added after Phase 4)
+Purpose: help a modern reader understand the KJV. Words that are archaic, or that meant something else in 1611, get a broken underline; clicking one opens a small card with the meaning. Three levels in Settings: *Off*, *Changed meanings* (only the familiar-looking words that mislead) and *All words* (the default, which adds archaic words and old measures).
+- **Three kinds of word** (`data/glossary.txt`, about 590 entries): *archaic* words (wist, straightway, swaddling), *changed meanings* or "false friends" (prevent = go before, conversation = conduct, charity = love, suffer = allow, corn = grain, meat = food), and *old measures* (cubit, ephah, shekel). Old pronouns and verb endings (thou, hath, -eth) and old spellings (shew, honour) are deliberately left out.
+- **False friends come first.** An old word announces itself; a familiar one quietly misleads. Their underline is stronger, and the card contrasts *In the KJV* with *Today*.
+- **Accuracy over coverage.** Words that keep their modern meaning almost everywhere ("let", "suffer", "meet", "whole", "knew", "ought") are defined only in the verses where the KJV sense applies, and a test checks that every listed verse really contains the word. Every entry was checked against real verses, and `npm test` fails if an entry names a word that never occurs in the KJV or two entries claim the same word in one verse.
+- **How the word list was found:** archaic words are the ones frequent in the KJV but absent from the modern WEB (`npm run data:fetch -- web`, then `npm run glossary:gaps` lists what is still unexplained). False friends came from knowledge of the text, then were checked in context.
+- **Caveat:** the definitions were written for this app, not taken from a published dictionary, so they should be reviewed by someone who knows the text well. `npm run glossary:review` writes `docs/glossary-review.md` (not committed): every entry with a checkbox and real verses to judge it against.
+- **Follow-ups:** the words can only be opened with the mouse (a keyboard path belongs in the Phase 6 accessibility work); the card is not yet offered in Search results, the Library or the verse of the day.
+
 ## Phase 5: Depth features (3-5 days)
 - Reading plans with progress tracking.
 - Cross-references (needs a separate public-domain data source) and a copy or share verse card.

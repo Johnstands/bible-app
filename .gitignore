@@ -26,3 +26,6 @@ dist-ssr
 # Bible data: downloaded sources and the DB generated from them
 data/sources
 src-tauri/resources/bible.db
+
+# Generated review sheet for the word-help definitions
+docs/glossary-review.md

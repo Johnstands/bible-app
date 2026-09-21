@@ -1,4 +1,8 @@
+import { useMemo } from "react";
 import type { Book, ChapterMarks, HighlightColor, Verse } from "./api";
+import { annotate, verseKey } from "./glossary";
+import type { GlossaryEntry, GlossaryIndex, Segment } from "./glossary";
+import type { WordHelpLevel } from "./settings";
 import { chapterTitle } from "./nav";
 import type { Position } from "./nav";
 
@@ -17,6 +21,7 @@ export interface Neighbor {
 export interface Layout {
   verseByVerse: boolean;
   pilcrows: boolean;
+  wordHelp: WordHelpLevel;
 }
 
 type Item =
@@ -56,18 +61,54 @@ interface Props {
   selected: ReadonlySet<number>;
   target: Target | null;
   layout: Layout;
+  /** Archaic words and false friends to underline; null until the books are known. */
+  glossary: GlossaryIndex | null;
   prev: Neighbor | null;
   next: Neighbor | null;
   onNavigate: (pos: Position) => void;
   onVerseClick: (verse: number, e: React.MouseEvent) => void;
   onOpenNote: (verse: number) => void;
+  onWordClick: (entry: GlossaryEntry, word: string, anchor: HTMLElement) => void;
 }
 
 export function Chapter({
-  book, chapter, verses, marks, selected, target, layout, prev, next,
-  onNavigate, onVerseClick, onOpenNote,
+  book, chapter, verses, marks, selected, target, layout, glossary, prev, next,
+  onNavigate, onVerseClick, onOpenNote, onWordClick,
 }: Props) {
   const items = toItems(verses);
+  const help = useMemo(
+    () =>
+      layout.wordHelp !== "off" && glossary
+        ? new Map(verses.map((v) => [v.verse, annotate(v.text, verseKey(book.id, chapter, v.verse), glossary)]))
+        : null,
+    [verses, glossary, layout.wordHelp, book.id, chapter],
+  );
+
+  const renderText = (v: Verse): React.ReactNode => {
+    const segments: Segment[] | undefined = help?.get(v.verse);
+    if (!segments) return v.text;
+    // "Changed meanings" keeps only the words that look familiar but meant something else.
+    const shown = (e: GlossaryEntry | undefined): e is GlossaryEntry => !!e && (layout.wordHelp === "all" || e.kind === "changed");
+    return segments.map((seg, i) => {
+      const entry = seg.entry;
+      if (!shown(entry)) return seg.text;
+      return (
+        <span
+          key={i}
+          className="kjv-word"
+          data-kind={entry.kind}
+          onClick={(e) => {
+            // Copying a phrase by dragging over it must not open the card.
+            if (window.getSelection()?.toString()) return;
+            e.stopPropagation(); // and it isn't a click on the verse
+            onWordClick(entry, seg.text, e.currentTarget);
+          }}
+        >
+          {seg.text}
+        </span>
+      );
+    });
+  };
   const firstBlock = items.findIndex((i) => i.type === "block");
   // Psalms open with a title and stanzas, so the chapter number is centered above them
   // instead of dropping into the first line.
@@ -114,7 +155,7 @@ export function Chapter({
             }}
           />
         )}
-        {v.text}{" "}
+        {renderText(v)}{" "}
       </span>
     );
   };

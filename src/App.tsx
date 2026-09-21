@@ -1,10 +1,13 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 import { EMPTY_MARKS, getChapter, getMarks, listBooks, saveNote, setHighlight, toggleBookmark } from "./api";
 import type { Book, ChapterMarks, HighlightColor, Verse } from "./api";
+import glossaryText from "../data/glossary.txt?raw";
 import { TRANSLATION } from "./config";
 import { Chapter } from "./Chapter";
 import type { Neighbor, Target } from "./Chapter";
+import { buildIndex, parseGlossary } from "./glossary";
+import type { GlossaryEntry } from "./glossary";
 import { GoTo } from "./GoTo";
 import type { Destination } from "./GoTo";
 import { Library } from "./Library";
@@ -20,6 +23,7 @@ import { applySettings, loadSettings, saveSettings } from "./settings";
 import { loadJson, saveJson } from "./storage";
 import { quotation, referenceLabel, span } from "./verses";
 import { VerseOfTheDay } from "./VerseOfTheDay";
+import { WordHelp } from "./WordHelp";
 import { hasSeenVerseToday, markVerseSeen } from "./votd";
 
 const IDLE_MS = 2500;
@@ -88,6 +92,7 @@ function App() {
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [settings, setSettings] = useState(loadSettings);
+  const [help, setHelp] = useState<{ entry: GlossaryEntry; word: string; anchor: HTMLElement } | null>(null);
   const jumpId = useRef(0);
   const restoreScroll = useRef<number | null>(saved.current.scroll);
   const idle = useIdle(IDLE_MS);
@@ -138,11 +143,27 @@ function App() {
     }
   }, [loaded?.book, loaded?.chapter, ready, target]);
 
-  // A selection belongs to one chapter.
+  // A selection, and an open word card, belong to one chapter.
   useEffect(() => {
     setSelected(new Set());
     anchor.current = null;
+    setHelp(null);
   }, [loaded?.book, loaded?.chapter]);
+
+  // The glossary needs the book list to resolve its verse references. A bad entry must not take the reader down.
+  const glossary = useMemo(() => {
+    if (books.length === 0) return null;
+    try {
+      return buildIndex(parseGlossary(glossaryText), books);
+    } catch (e) {
+      console.error(e);
+      return null;
+    }
+  }, [books]);
+  const closeHelp = useCallback(() => setHelp(null), []);
+  const showWord = useCallback((entry: GlossaryEntry, word: string, anchorEl: HTMLElement) => {
+    setHelp((cur) => (cur?.anchor === anchorEl ? null : { entry, word, anchor: anchorEl })); // a second click puts it away
+  }, []);
 
   useEffect(() => {
     saveJson("position", { ...pos, scroll: 0 });
@@ -191,6 +212,7 @@ function App() {
 
   const show = (p: Panel) => {
     setNote(null); // a panel and the note editor never share the screen
+    setHelp(null);
     setPanel(p);
   };
   const openGoto = () => show("goto");
@@ -339,7 +361,10 @@ function App() {
         e.target instanceof HTMLElement &&
         (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.isContentEditable);
       if (e.ctrlKey || e.metaKey || e.altKey || typing || overlayOpen) return;
-      if (e.key === "Escape") clearSelection();
+      if (e.key === "Escape") {
+        if (help) setHelp(null);
+        else clearSelection();
+      }
       else if (e.key === "/") {
         e.preventDefault();
         openGoto();
@@ -393,11 +418,13 @@ function App() {
               selected={selected}
               target={ready ? target : null}
               layout={settings}
+              glossary={glossary}
               prev={prev}
               next={next}
               onNavigate={(p) => navigate({ ...p })}
               onVerseClick={onVerseClick}
               onOpenNote={openNote}
+              onWordClick={showWord}
             />
           </div>
         )}
@@ -416,6 +443,10 @@ function App() {
           onCopy={copySelection}
           onClear={clearSelection}
         />
+      )}
+
+      {help && !overlayOpen && (
+        <WordHelp entry={help.entry} word={help.word} anchor={help.anchor} onClose={closeHelp} />
       )}
 
       {notice && (

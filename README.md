@@ -19,7 +19,7 @@ go in a separate `user.db` in the app data directory.
 
 Tests: `npm test` (reference parser) and `cargo test` in `src-tauri/` (needs `bible.db` to exist).
 
-Keys: `/` or `Ctrl+K` opens Go to (try `jn 3:16`), `Ctrl+F` searches (quotes match an exact phrase), `Ctrl+L` opens the Library, `Ctrl+,` opens Settings, `←` `→` change chapter. Click a verse to select it (shift-click for a range).
+Keys: `/` or `Ctrl+K` opens Go to (try `jn 3:16`), `Ctrl+F` searches (quotes match an exact phrase), `Ctrl+L` opens the Library, `Ctrl+,` opens Settings, `←` `→` change chapter. Click a verse to select it (shift-click for a range). Click an underlined word for its meaning.
 
 Search speed is enforced by `cargo test --release` (100 ms); the plain `cargo test` uses a looser bound because unoptimized builds are about 4x slower.
 
@@ -34,6 +34,11 @@ npm run ui:dev                          # a Vite server on :1430
 node scripts/ui/shots.mjs out           # selection, highlights, notes
 node scripts/ui/shots-settings.mjs out  # settings and text features
 node scripts/ui/shots-library.mjs out   # Library and verse of the day
+node scripts/ui/shots-words.mjs out     # word help
 ```
 
 It expects Chromium at `/usr/bin/chromium` (override with `CHROMIUM`).
+
+## Word help
+
+Archaic words and words whose meaning has changed are underlined; click one for its meaning. The list lives in `data/glossary.txt`, one entry per line (`forms | kind | meaning | today | verses`; the format is explained at the top of the file). `npm test` checks it against the real Bible text. To look for words still missing, run `npm run data:fetch -- web` and then `npm run glossary:gaps`, which lists words that are common in the KJV but absent from the modern World English Bible. `npm run glossary:review` writes `docs/glossary-review.md`, a checklist of every entry with real verses beside it, for reviewing the definitions.

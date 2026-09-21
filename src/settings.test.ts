@@ -10,7 +10,7 @@ describe("sanitizeSettings", () => {
   });
 
   it("keeps valid values", () => {
-    const s = { theme: "dark", fontFamily: "literata", fontScale: 1.2, verseByVerse: true, pilcrows: true, verseOfTheDay: false };
+    const s = { theme: "dark", fontFamily: "literata", fontScale: 1.2, verseByVerse: true, pilcrows: true, verseOfTheDay: false, wordHelp: "changed" };
     expect(sanitizeSettings(s)).toEqual(s);
   });
 
@@ -26,6 +26,22 @@ describe("sanitizeSettings", () => {
     expect(sanitizeSettings(null, "sepia").theme).toBe("sepia");
     expect(sanitizeSettings({ theme: "dark" }, "sepia").theme).toBe("dark");
     expect(sanitizeSettings(null, "nonsense").theme).toBe("paper");
+  });
+});
+
+describe("word help level", () => {
+  it("defaults to all words and keeps a valid level", () => {
+    expect(sanitizeSettings({}).wordHelp).toBe("all");
+    for (const level of ["off", "changed", "all"]) expect(sanitizeSettings({ wordHelp: level }).wordHelp).toBe(level);
+  });
+
+  it("reads the on/off value saved before there were levels", () => {
+    expect(sanitizeSettings({ wordHelp: true }).wordHelp).toBe("all");
+    expect(sanitizeSettings({ wordHelp: false }).wordHelp).toBe("off");
+  });
+
+  it("falls back for anything else", () => {
+    for (const bad of ["most", 2, null, {}, "toString"]) expect(sanitizeSettings({ wordHelp: bad }).wordHelp).toBe("all");
   });
 });
 
