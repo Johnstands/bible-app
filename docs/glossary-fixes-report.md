@@ -26,7 +26,7 @@ text in `bible.db`. The file now has 591 entries.
 **2. Kinds**
 - 2.1: `archaic` -> `changed` for `tired`, `strange woman, strange women`, `strange wives`, `strange gods, strange god`, and the `i pray thee...` entry.
 - 2.2: `strange fire`, `strange land`, `strange children` now `changed`, each with its Today field.
-- 2.3: 16 modern words `archaic` -> `changed` with a Today field: `target, targets`, `founder`, `amber` (also dropped ", not the yellow resin" from its meaning), `league`, `parlour`, `pastors`, `vintage`, `ensue`, `supplant, supplanted`, `certify`, `outlandish`, `overcharge, overcharged`, `hale`, `rent`, `seethe, seething`, `sodden`.
+- 2.3: 16 modern words `archaic` -> `changed` with a Today field: `target, targets`, `founder`, `amber` (also dropped ", not the yellow resin" from its meaning), `league`, `parlour`, `pastors`, `vintage`, `ensue`, `supplant, supplanted`, `certify`, `outlandish`, `overcharge, overcharged`, `hale`, `rent`, `seethe, seething`, `sodden`. **Two were adjusted afterwards (see "Second look" below): `pastors` is now limited to Jeremiah, and `supplant, supplanted` is back to plain `archaic`.**
 - 2.4: `from without` is now `archaic` with the "Today: from lacking" field removed.
 
 **3. Glosses**
@@ -35,7 +35,7 @@ text in `bible.db`. The file now has 591 entries.
 - 3.1: `sunder` -> `in sunder`. **Verified:** "sunder" occurs 7 times in the KJV (Psalms 46:9, 107:14, 107:16; Isaiah 27:9, 45:2; Nahum 1:13; Luke 12:46), always as "in sunder".
 
 **4. Verses**
-- 4.1: `lighted` restricted to Genesis 24:64; Joshua 15:18; Judges 1:14; Judges 4:15; 1 Samuel 25:23; 2 Kings 5:21; Isaiah 9:8. **All seven verified**, each containing "lighted" in the got-down / fell-upon sense. Meaning extended with "(of a word) fell upon".
+- 4.1: `lighted` restricted to Genesis 24:64; Joshua 15:18; Judges 1:14; Judges 4:15; 1 Samuel 25:23; 2 Kings 5:21; Isaiah 9:8. **All seven verified**, each containing "lighted" in the got-down / fell-upon sense. Meaning extended with "(of a word) fell upon". (Two more verses were added afterwards; see "Second look".)
 - 4.2: `lewd` restricted to Acts 17:5 (verified: "certain lewd fellows of the baser sort").
 - 4.3: `whole`: removed Jeremiah 19:11 (a broken vessel, meaning intact); added Matthew 14:36, Luke 7:10, John 7:23, Acts 4:10, **all verified** ("perfectly whole", "found the servant whole", "every whit whole", "standeth here before you whole").
 - 4.4: `let` -> `let, letteth` (2 Thessalonians 2:7 reads "he who now letteth will let", verified). `press` (winepress) -> `press, presses` with Proverbs 3:10 and Isaiah 16:10 added (both read "presses", verified). `mark` (notice) -> `mark, marked` with Luke 14:7 added ("when he marked how they chose out the chief rooms", verified). **Checked** the 15 existing verses on the `mark` line: every one uses "mark", none uses "marked", so the new form cannot match in a different sense there.
@@ -47,9 +47,28 @@ text in `bible.db`. The file now has 591 entries.
 - **Nothing was skipped for want of verification.** Every verse marked VERIFY was found and contained the word in the stated sense.
 - **4.6: Acts 24:19 was not added to `ought`**, as instructed. Known limitation: the verse uses "ought" in both senses ("who ought to have been here... if they had ought against me"), and matching by verse cannot tell them apart.
 
-## Found while checking (not applied, for a human decision)
+## Second look: `pastors`, `supplant` and `lighted`
 
-- **`lighted`: two more archaic uses the review did not list.** Genesis 28:11 ("he lighted upon a certain place") and 2 Kings 10:15 ("he lighted on Jehonadab"), meaning came upon or met. They are not "got down" or "fell upon" exactly, so a fitting gloss would need adding, for example "came upon; met by chance". The other four unlisted uses (Exodus 40:25, Numbers 8:3, Luke 8:16, Luke 11:33) are the modern "kindled" and correctly stay unmatched.
+Checking the review against every KJV use of these words turned up three places to adjust. All three are now applied.
+
+- **`pastors`: limited to Jeremiah.** The KJV has "pastors" 8 times: 7 in Jeremiah (2:8, 3:15, 10:21, 12:10, 22:22,
+  23:1, 23:2), where it means shepherds of the people, that is rulers and leaders, and 1 in Ephesians 4:11 ("pastors
+  and teachers"), where it already means what it does today. The review's `changed` kind with "Today: church
+  ministers" would have told readers something false about Ephesians. It is now `changed` with "Today: church
+  ministers" and scoped to the seven Jeremiah verses, so Ephesians 4:11 is left unmarked. There is nothing to
+  explain there: the modern word comes from that very usage.
+- **`supplant, supplanted`: reverted to `archaic`, no Today field** (its original form). Its two uses are Genesis
+  27:36 (Jacob "hath supplanted me... he took away my birthright") and Jeremiah 9:4 ("every brother will utterly
+  supplant"). The modern word already means to take someone's place, often by scheming, so this is not a false
+  friend, and "Today: replace" would have misdirected. It stays as an entry because the word is now uncommon.
+- **`lighted`: two verses added.** Genesis 28:11 ("he lighted upon a certain place") and 2 Kings 10:15 ("he lighted
+  on Jehonadab") use the archaic sense of coming upon or meeting by chance. Both were verified, and the meaning now
+  reads "got down; came down and landed; came upon or met by chance; (of a word) fell upon". The other four unlisted
+  uses (Exodus 40:25, Numbers 8:3, Luke 8:16, Luke 11:33) are the modern "kindled" and stay unmarked.
+
+These decisions, and several others from the review (`sunder`, `lewd`, `hale`, `whole`, `letteth`, `presses`, the
+`sore ...` phrases, and the Acts 24:19 limitation), are now covered by a test in `src/glossary.test.ts` ("keeps the
+decisions from the glossary review").
 
 ## Needs human decision (not applied)
 
@@ -114,4 +133,4 @@ After the edits:
 validation done
 ```
 
-The project's own tests (`npm test`, which check every form and scoped verse against the real Bible) also pass: 113 of 113.
+The project's own tests (`npm test`, which check every form and scoped verse against the real Bible) also pass: 114 of 114, including the new test that pins the review's decisions.

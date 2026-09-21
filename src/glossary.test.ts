@@ -140,6 +140,50 @@ describe.skipIf(!fs.existsSync(DB))("the glossary against the Bible", () => {
     expect(one("Selah.")).toEqual(["Selah"]);
   });
 
+  it("keeps the decisions from the glossary review", () => {
+    const found = (ref: string) => {
+      const r = parseReference(ref, books);
+      if (r.kind !== "ref" || !r.verse) throw new Error(ref);
+      return annotate(textOf(ref), verseKey(r.book.id, r.chapter, r.verse), index).filter((s) => s.entry);
+    };
+    const words = (ref: string) => found(ref).map((s) => s.text.toLowerCase());
+
+    // "pastors" misleads only in Jeremiah, where it means shepherds of the people; in Ephesians it means what it does now.
+    expect(words("Jeremiah 23:1")).toContain("pastors");
+    expect(words("Jeremiah 3:15")).toContain("pastors");
+    expect(words("Ephesians 4:11")).not.toContain("pastors");
+
+    // "lighted" is flagged where it means alighted or came upon, not where a candle was lit.
+    for (const ref of ["Genesis 24:64", "Genesis 28:11", "2 Kings 10:15", "Isaiah 9:8"]) expect(words(ref), ref).toContain("lighted");
+    for (const ref of ["Luke 8:16", "Luke 11:33", "Exodus 40:25", "Numbers 8:3"]) expect(words(ref), ref).not.toContain("lighted");
+
+    // "supplant" is a plain archaic entry, not a false friend.
+    const supplant = found("Genesis 27:36").find((s) => s.text.toLowerCase() === "supplanted")!.entry!;
+    expect([supplant.kind, supplant.today]).toEqual(["archaic", null]);
+
+    // "sunder" is only ever "in sunder"; "lewd" misleads only in Acts; "hale" is a false friend.
+    expect(words("Psalms 46:9")).toContain("in sunder");
+    expect(words("Acts 17:5")).toContain("lewd");
+    expect(words("Ezekiel 16:27")).not.toContain("lewd");
+    const hale = found("Luke 12:58").find((s) => s.text.toLowerCase() === "hale")!.entry!;
+    expect([hale.kind, hale.today]).toEqual(["changed", "healthy"]);
+
+    // "whole" means healed, not the intact pot of Jeremiah 19:11; "letteth" is matched; "presses" are winepresses.
+    expect(words("Luke 7:10")).toContain("whole");
+    expect(words("Jeremiah 19:11")).not.toContain("whole");
+    expect(words("2 Thessalonians 2:7")).toEqual(expect.arrayContaining(["letteth"]));
+    expect(words("Proverbs 3:10")).toContain("presses");
+
+    // The "sore ..." phrases no longer hide the separate glosses for these words.
+    expect(words("Psalms 6:3")).toEqual(expect.arrayContaining(["vexed"]));
+    expect(words("Judges 15:18")).toContain("athirst");
+    expect(words("Jeremiah 50:12")).toContain("confounded");
+    expect(words("Genesis 20:8")).toContain("sore afraid"); // the phrases that remain still win
+
+    // Known limitation, on purpose: Acts 24:19 uses "ought" in both senses, so the verse is left alone.
+    expect(words("Acts 24:19")).not.toContain("ought");
+  });
+
   it("prefers the longer phrase and keeps the surrounding text intact", () => {
     const text = "Bid him God speed: I pray thee, by and by.";
     const segments = annotate(text, "0:0:0", index);

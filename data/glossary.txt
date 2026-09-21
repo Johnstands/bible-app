@@ -99,7 +99,7 @@ requite, requited | archaic | repay; pay back
 avouched | archaic | declared; affirmed
 adjured | archaic | solemnly commanded, under oath
 minish, minished | archaic | reduce; make less
-supplant, supplanted | changed | trip up; overthrow by trickery | Today: replace
+supplant, supplanted | archaic | trip up; overthrow by trickery
 whet | archaic | sharpen
 noised | archaic | spread as news; made known
 dissembled | archaic | pretended; hid one's real feelings
@@ -120,7 +120,7 @@ strawed | archaic | scattered; spread out
 mete, meted | archaic | measure out
 sup | archaic | eat supper; dine
 lade, laded, ladeth | archaic | load; loaded
-lighted | archaic | got down; came down and landed; (of a word) fell upon | | @ Genesis 24:64; Joshua 15:18; Judges 1:14; Judges 4:15; 1 Samuel 25:23; 2 Kings 5:21; Isaiah 9:8
+lighted | archaic | got down; came down and landed; came upon or met by chance; (of a word) fell upon | | @ Genesis 24:64; Genesis 28:11; Joshua 15:18; Judges 1:14; Judges 4:15; 1 Samuel 25:23; 2 Kings 5:21; 2 Kings 10:15; Isaiah 9:8
 stablish, stablished | archaic | establish; make firm
 dumb | changed | unable to speak; silent | Today: stupid
 listed, listeth | archaic | wish; wished; chooses
@@ -203,7 +203,7 @@ ensign | archaic | a banner; signal flag
 vesture | archaic | clothing; a garment
 emerods | archaic | haemorrhoids; painful swellings
 straitened | archaic | restricted; made narrow
-pastors | changed | shepherds (of a flock, or of people) | Today: church ministers
+pastors | changed | shepherds (of a flock, or of people) | Today: church ministers | @ Jeremiah 2:8; Jeremiah 3:15; Jeremiah 10:21; Jeremiah 12:10; Jeremiah 22:22; Jeremiah 23:1; Jeremiah 23:2
 tares | archaic | weeds that look like wheat
 edify, edifying, edification | archaic | build up (in faith); encourage
 provender | archaic | fodder; feed for animals
