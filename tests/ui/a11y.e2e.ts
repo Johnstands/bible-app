@@ -87,14 +87,16 @@ describe("lists in the dialogs", () => {
     await app.page.keyboard.press("Control+l");
     await app.page.waitForSelector(".lib-row");
     await app.page.keyboard.press("ArrowRight"); // Notes tab
-    await app.page.waitForFunction(() => document.activeElement?.getAttribute("role") === "tab");
-    expect(await app.page.$eval('[role="tab"][aria-selected="true"]', (e) => e.textContent)).toContain("Notes");
+    await app.page.waitForFunction(() =>
+      document.querySelector('[role="tab"][aria-selected="true"]')?.textContent?.includes("Notes"),
+    );
+    expect(await app.page.evaluate(() => document.activeElement?.getAttribute("role"))).toBe("tab");
     await app.page.keyboard.press("ArrowLeft");
     await app.page.waitForFunction(() => document.activeElement?.textContent?.includes("Bookmarks"));
     await app.page.keyboard.press("ArrowDown");
-    expect(await app.page.evaluate(() => document.activeElement?.className)).toContain("lib-go");
+    await app.page.waitForFunction(() => document.activeElement?.className?.includes("lib-go"));
     await app.page.keyboard.press("ArrowDown");
-    expect(await app.page.evaluate(() => document.querySelectorAll(".lib-row")[1]?.contains(document.activeElement))).toBe(true);
+    await app.page.waitForFunction(() => document.querySelectorAll(".lib-row")[1]?.contains(document.activeElement));
     await app.page.keyboard.press("Enter");
     await app.page.waitForSelector(".library", { state: "detached" });
     expect(await app.page.$(".verse.is-target")).not.toBeNull();
