@@ -47,6 +47,13 @@ The app asks `https://github.com/Johnstands/bible-app/releases/latest/download/l
 for a *published* release (not a draft), and only when the release has a `latest.json` asset, which the Release
 workflow creates when the signing secrets are set. Settings shows "Couldn't check for updates" if it can't be reached.
 
+## Release file names
+
+The app's name has an apostrophe ("KJV Reader's Bible"). GitHub rewrites it when it stores a file, but tauri-action
+doesn't expect that, so it can't match the `.sig` files and skips `latest.json` (the log says "Signature not found for
+the updater JSON"). The workflow therefore sets `assetNamePattern`, and the files are named
+`kjv-readers-bible_<version>_amd64.AppImage` and so on. Keep the product name out of that pattern.
+
 ## The AppImage on newer distributions
 
 The AppImage bundles Wayland and epoxy libraries built for Ubuntu. On a newer system (Arch, for one) they clash with

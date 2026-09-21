@@ -41,5 +41,9 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: "KJV Reader's Bible ${{ github.ref_name }}"
           releaseBody: "Install the AppImage or the .deb. Installed copies offer this version as an update once it is published."
+          # GitHub rewrites the apostrophe in the product name when it stores a file, but tauri-action
+          # doesn't expect that and then can't find the .sig files, so latest.json is never made.
+          # Naming the files ourselves avoids the mismatch.
+          assetNamePattern: "kjv-readers-bible_[version]_[arch][ext]"
           releaseDraft: true
           prerelease: false
