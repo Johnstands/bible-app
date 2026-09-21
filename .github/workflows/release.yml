@@ -1,17 +1,77 @@
 name: Release
 
-# Push a tag such as v0.2.0 to build the Linux packages and attach them, with the update manifest, to a
-# draft GitHub release. Publish the draft to make it the version the app offers to update to.
+# Push a tag such as v0.2.0 to build the Linux, macOS and Windows packages and attach them, with the update
+# manifest, to a draft GitHub release. Publish the draft to make it the version the app offers to update to.
+#
+# Run it by hand (Actions > Release > Run workflow) to try the whole build without a version tag: it makes a draft
+# named "build-test", which you can delete afterwards.
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
 
 permissions:
   contents: write
 
+env:
+  TAG: ${{ github.ref_type == 'tag' && github.ref_name || 'build-test' }}
+
 jobs:
-  linux:
+  # The Bible database is the same on every platform, so build it once and share it.
+  data:
     runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24 # the data build uses node:sqlite
+      - name: Build the Bible database
+        run: |
+          npm run data:fetch
+          npm run data:build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bible-db
+          path: src-tauri/resources/bible.db
+          retention-days: 1
+
+  # One draft release for all the platform builds to attach to. Creating it in each build job would race.
+  release:
+    runs-on: ubuntu-24.04
+    outputs:
+      id: ${{ steps.draft.outputs.id }}
+    steps:
+      - id: draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          id=$(gh api "repos/$GITHUB_REPOSITORY/releases" --paginate \
+            --jq ".[] | select(.draft and .tag_name == \"$TAG\") | .id" | head -n 1)
+          if [ -z "$id" ]; then
+            id=$(gh api "repos/$GITHUB_REPOSITORY/releases" \
+              -f tag_name="$TAG" -f target_commitish="$GITHUB_SHA" \
+              -f name="KJV Reader's Bible $TAG" \
+              -f body="Install the AppImage or .deb on Linux, the .dmg on macOS, or the .exe on Windows. Installed copies offer this version as an update once it is published." \
+              -F draft=true --jq .id)
+          fi
+          echo "id=$id" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: [data, release]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux
+            os: ubuntu-24.04
+          - name: macOS
+            os: macos-latest
+            rust_targets: aarch64-apple-darwin,x86_64-apple-darwin
+            args: --target universal-apple-darwin
+          - name: Windows
+            os: windows-latest
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -19,18 +79,21 @@ jobs:
           node-version: 24
           cache: npm
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_targets }}
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
       - name: System libraries for Tauri
+        if: matrix.name == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+      - uses: actions/download-artifact@v4
+        with:
+          name: bible-db
+          path: src-tauri/resources
       - run: npm ci
-      - name: Build the Bible database
-        run: |
-          npm run data:fetch
-          npm run data:build
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -38,12 +101,9 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           NO_STRIP: "true" # linuxdeploy's bundled strip can't read newer libraries
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: "KJV Reader's Bible ${{ github.ref_name }}"
-          releaseBody: "Install the AppImage or the .deb. Installed copies offer this version as an update once it is published."
+          releaseId: ${{ needs.release.outputs.id }}
+          args: ${{ matrix.args }}
           # GitHub rewrites the apostrophe in the product name when it stores a file, but tauri-action
           # doesn't expect that and then can't find the .sig files, so latest.json is never made.
-          # Naming the files ourselves avoids the mismatch.
-          assetNamePattern: "kjv-readers-bible_[version]_[arch][ext]"
-          releaseDraft: true
-          prerelease: false
+          # Naming the files ourselves avoids the mismatch. [setup] is "-setup" for the Windows installer.
+          assetNamePattern: "kjv-readers-bible_[version]_[arch][setup][ext]"

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useReturnFocus } from "./useReturnFocus";
+import { shortcutLabel } from "./platform";
 
 export interface NoteDraft {
   book: number;
@@ -73,7 +74,7 @@ export function NoteEditor({ draft, onSave, onDelete, onClose }: Props) {
               Delete note
             </button>
           ) : (
-            <span>Ctrl+Enter to save</span>
+            <span>{shortcutLabel("Enter")} to save</span>
           )}
           <span className="note-actions">
             <button onClick={onClose}>Cancel</button>

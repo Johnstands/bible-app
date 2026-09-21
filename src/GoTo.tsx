@@ -4,6 +4,7 @@ import { chapterTitle } from "./nav";
 import type { Position } from "./nav";
 import { parseReference } from "./reference";
 import { useReturnFocus } from "./useReturnFocus";
+import { shortcutLabel } from "./platform";
 
 export interface Destination extends Position {
   verse?: number;
@@ -64,7 +65,7 @@ export function GoTo({ books, current, onGo, onSearch, onClose }: Props) {
     }
     // Anything typed can also be searched for, so "job" can mean the book or the word.
     const text = query.trim();
-    return text ? [...found, { label: `Search for “${text}”`, hint: "Ctrl+F", search: true }] : found;
+    return text ? [...found, { label: `Search for “${text}”`, hint: shortcutLabel("F"), search: true }] : found;
   }, [query, books]);
 
   const browsing = query.trim() === "";

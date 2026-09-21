@@ -4,6 +4,9 @@
 //! system's copies preloaded, so they win over the bundled ones. The web and network processes
 //! inherit the setting.
 
+// Only Linux calls into this; the pure part is still built (and tested) everywhere.
+#![cfg_attr(not(target_os = "linux"), allow(dead_code))]
+
 use std::path::{Path, PathBuf};
 
 const LIBS: [&str; 4] = [

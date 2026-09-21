@@ -4,13 +4,14 @@ import {
 } from "./settings";
 import type { FontFamily, Settings as SettingsValue } from "./settings";
 import { useReturnFocus } from "./useReturnFocus";
+import { shortcutLabel } from "./platform";
 
 // [keys, what they do]
 const SHORTCUTS: [string[], string][] = [
-  [["/"], "Go to a book, chapter or verse (also Ctrl+K)"],
-  [["Ctrl+F"], "Search"],
-  [["Ctrl+L"], "Library of bookmarks, notes and highlights"],
-  [["Ctrl+,"], "Settings"],
+  [["/"], `Go to a book, chapter or verse (also ${shortcutLabel("K")})`],
+  [[shortcutLabel("F")], "Search"],
+  [[shortcutLabel("L")], "Library of bookmarks, notes and highlights"],
+  [[shortcutLabel(",")], "Settings"],
   [["←", "→"], "Previous or next chapter"],
   [["J", "K"], "Move down or up through the verses"],
   [["Space"], "Select or unselect the verse"],

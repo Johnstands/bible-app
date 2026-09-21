@@ -28,6 +28,7 @@ import { VerseOfTheDay } from "./VerseOfTheDay";
 import { WordHelp } from "./WordHelp";
 import { hasSeenVerseToday, markVerseSeen } from "./votd";
 import { KIND_LABELS } from "./glossary";
+import { shortcutLabel } from "./platform";
 
 const IDLE_MS = 2500;
 /** Wait this long after the first chapter appears before asking about updates, so startup stays quick. */
@@ -541,17 +542,17 @@ function App() {
       {/* While a dialog is open the page behind it can't be focused or read: the dialog is all there is. */}
       <div className="app-shell" inert={overlayOpen}>
         <header className={`topbar${idle && !overlayOpen ? " is-idle" : ""}`}>
-          <button className="location" onClick={openGoto} title="Go to… (Ctrl+K or /)">
+          <button className="location" onClick={openGoto} title={`Go to… (${shortcutLabel("K")} or /)`}>
             {book ? label(pos) : ""}
           </button>
           <div className="topbar-right">
-            <button className="topbar-button" onClick={openLibrary} title="Library: bookmarks, notes and highlights (Ctrl+L)">
+            <button className="topbar-button" onClick={openLibrary} title={`Library: bookmarks, notes and highlights (${shortcutLabel("L")})`}>
               Library
             </button>
-            <button className="topbar-button" onClick={() => openSearch()} title="Search (Ctrl+F)">
+            <button className="topbar-button" onClick={() => openSearch()} title={`Search (${shortcutLabel("F")})`}>
               Search
             </button>
-            <button className="topbar-button topbar-type" onClick={openSettings} title="Settings (Ctrl+,)" aria-label="Settings">
+            <button className="topbar-button topbar-type" onClick={openSettings} title={`Settings (${shortcutLabel(",")})`} aria-label="Settings">
               Aa
             </button>
             <span className="translation" title="King James Version">
