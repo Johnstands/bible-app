@@ -19,9 +19,14 @@ Updates are signed, so an installed app only accepts a build made with your key.
 1. Choose the new version and set it in three places, all the same: `package.json`, `src-tauri/Cargo.toml` and
    `src-tauri/tauri.conf.json`.
 2. Commit, then tag and push: `git tag v0.2.0 && git push origin main v0.2.0`.
-3. The **Release** workflow builds the packages and attaches them, with `latest.json`, to a *draft* release.
-4. Try the AppImage or .deb from the draft. When you are happy, publish the release: that is the moment installed
-   copies start offering it.
+3. The **Release** workflow builds the Bible database once, creates a *draft* release, then builds Linux (AppImage and
+   .deb), macOS (one universal .dmg for Intel and Apple Silicon) and Windows (an .exe installer) into it, with a single
+   `latest.json` covering all three. It takes about 15 minutes.
+4. Try the packages from the draft. When you are happy, publish the release: that is the moment installed copies
+   start offering it.
+
+To try the whole build without a version tag, run **Release** by hand (Actions > Release > Run workflow, or
+`gh workflow run release.yml --ref <branch>`). It makes a draft called `build-test`; delete it afterwards.
 
 To build locally instead:
 
@@ -53,6 +58,25 @@ The app's name has an apostrophe ("KJV Reader's Bible"). GitHub rewrites it when
 doesn't expect that, so it can't match the `.sig` files and skips `latest.json` (the log says "Signature not found for
 the updater JSON"). The workflow therefore sets `assetNamePattern`, and the files are named
 `kjv-readers-bible_<version>_amd64.AppImage` and so on. Keep the product name out of that pattern.
+
+## macOS and Windows
+
+The Windows and macOS builds are made by CI and have not been run by the maintainer, so treat them as untested until
+someone has installed them. They are not signed with an Apple or Windows certificate, so the first launch warns:
+
+- **macOS:** the app is ad-hoc signed but not notarized. Open the .dmg, drag the app to Applications, then right-click
+  it and choose Open (or run `xattr -dr com.apple.quarantine "/Applications/KJV Reader's Bible.app"`).
+- **Windows:** SmartScreen says "Windows protected your PC". Choose More info, then Run anyway.
+
+In-app updates use the same signed `latest.json` on every platform, and do not depend on those certificates.
+
+Two things that only show up off Linux, both fixed once and worth remembering:
+
+- **File names that differ only by case** (such as `settings.ts` and `Settings.tsx`) break the TypeScript build on macOS
+  and Windows, whose filesystems ignore case. Keep module names distinct ignoring case.
+- **The apostrophe in the product name** makes the Windows installer script (NSIS) fail, so
+  `src-tauri/tauri.windows.conf.json` sets the product name to "KJV Readers Bible" there. Everywhere else, and in the
+  window title, it is "KJV Reader's Bible".
 
 ## The AppImage on newer distributions
 

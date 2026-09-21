@@ -1,6 +1,8 @@
 # KJV Reader's Bible
 
-Offline-first desktop Bible app built with Tauri v2, React and TypeScript.
+Offline-first desktop Bible app built with Tauri v2, React and TypeScript. Builds for Linux, macOS and Windows are on the
+[Releases page](https://github.com/Johnstands/bible-app/releases); see `docs/RELEASING.md` for the first-launch warnings
+on macOS and Windows.
 
 ## Development
 
