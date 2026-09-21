@@ -24,8 +24,20 @@ fetch_strongs() {
   done
 }
 
+# Cross-references: OpenBible.info (CC BY), mostly from the public-domain Treasury of Scripture Knowledge.
+fetch_crossrefs() {
+  local dest="data/sources/crossrefs"
+  if [ -f "$dest/cross_references.txt" ]; then echo "crossrefs: already present"; return; fi
+  mkdir -p "$dest"
+  curl -fsSL "https://a.openbible.info/data/cross-references.zip" -o "$dest/src.zip"
+  unzip -q -o "$dest/src.zip" -d "$dest"
+  rm "$dest/src.zip"
+  echo "crossrefs: downloaded"
+}
+
 fetch eng-kjv2006
 fetch_strongs
+fetch_crossrefs
 # The modern World English Bible is only used to find archaic KJV words: `npm run data:fetch -- web`.
 [ "${1:-}" = "web" ] && fetch eng-web
 true

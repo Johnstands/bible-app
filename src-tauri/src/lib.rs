@@ -1,4 +1,5 @@
 mod commands;
+mod crossrefs;
 mod db;
 mod strongs;
 mod syslibs;
@@ -42,6 +43,7 @@ pub fn run() {
             commands::search,
             commands::get_word_tags,
             commands::get_strongs,
+            commands::get_cross_refs,
             commands::get_marks,
             commands::set_highlight,
             commands::save_note,

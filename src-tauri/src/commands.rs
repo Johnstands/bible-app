@@ -1,6 +1,7 @@
 use crate::db::{self, Book, Result, SearchFilter, SearchResults, Translation, Verse};
 use crate::user::{self, ChapterMarks, Library, Note};
 use crate::strongs::{self, StrongsEntry, VerseTags};
+use crate::crossrefs::{self, CrossRef};
 use crate::AppState;
 use tauri::State;
 
@@ -36,6 +37,18 @@ pub fn get_word_tags(
     chapter: u32,
 ) -> Result<Vec<VerseTags>> {
     strongs::get_word_tags(&state.bible.lock().unwrap(), &translation, book, chapter)
+}
+
+/// Passages related to a verse, most useful first, each with its text.
+#[tauri::command]
+pub fn get_cross_refs(
+    state: State<AppState>,
+    translation: String,
+    book: u32,
+    chapter: u32,
+    verse: u32,
+) -> Result<Vec<CrossRef>> {
+    crossrefs::get_cross_refs(&state.bible.lock().unwrap(), &translation, book, chapter, verse)
 }
 
 /// The dictionary entry for a Strong's number such as `H7225`, or null if there is none.

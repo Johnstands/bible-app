@@ -47,6 +47,8 @@ Archaic words and words whose meaning has changed are underlined; click one for 
 
 Settings also has **Original-language words** (off by default; press S to switch it while reading). With it on, nearly every word of the text is clickable and the card shows the Hebrew or Greek behind it, from Strong's dictionary, with a link listing every verse that uses it. Searching `H7225` or `G26` does the same.
 
+Select a verse and choose **Cross-references** (or press X) to see the passages related to it, best first; choose one to read it.
+
 ## Building and releasing
 
 `npm run tauri build` makes the Linux packages (a `.deb` and an AppImage) in `src-tauri/target/release/bundle/`. Releases, signing and the update mechanism are described in [docs/RELEASING.md](docs/RELEASING.md).
@@ -60,4 +62,8 @@ The UI tests and screenshot scripts need Chromium. They look for `/usr/bin/chrom
   used here is by [Open Scriptures](https://github.com/openscriptures/strongs) and is licensed
   [CC BY-SA](https://creativecommons.org/licenses/by-sa/3.0/). It is downloaded by `npm run data:fetch` and built into
   `bible.db`; anything you distribute that includes that data carries the same licence for it.
+- **Cross-references** are from [OpenBible.info](https://www.openbible.info/labs/cross-references/), licensed
+  [CC BY](https://creativecommons.org/licenses/by/4.0/) and drawn mostly from the public-domain *Treasury of Scripture
+  Knowledge*. Each reference carries a vote for how useful readers found it; the build keeps those with three or more
+  votes and every verse's best five (about 243,000 of 345,000), so nearly every verse has some.
 - The word-help glossary (`data/glossary.txt`) is original to this project.

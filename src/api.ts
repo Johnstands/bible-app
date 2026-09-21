@@ -93,6 +93,23 @@ export interface StrongsEntry {
 
 export const getWordTags = (translation: string, book: number, chapter: number) =>
   invoke<VerseTags[]>("get_word_tags", { translation, book, chapter });
+/** A passage related to a verse: one verse, or a range that may run into a later chapter. */
+export interface CrossRef {
+  book: number;
+  chapter: number;
+  verse: number;
+  /** The last verse of the range; the same as `chapter` and `verse` for a single verse. */
+  endChapter: number;
+  endVerse: number;
+  /** How many readers found it useful; the list comes best first. */
+  votes: number;
+  /** The passage's text, cut to its first few verses if it is a long range. */
+  text: string;
+}
+
+/** Passages related to a verse, most useful first, with their text. */
+export const getCrossRefs = (translation: string, book: number, chapter: number, verse: number) =>
+  invoke<CrossRef[]>("get_cross_refs", { translation, book, chapter, verse });
 export const getStrongs = (num: string) => invoke<StrongsEntry | null>("get_strongs", { num });
 
 export const HIGHLIGHT_COLORS = ["yellow", "green", "blue", "pink", "purple"] as const;

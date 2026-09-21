@@ -50,6 +50,17 @@ export function createBackend({ update = null } = {}) {
           verse: r.verse, verseEnd: r.verse_end, text: r.text, kind: r.kind, newBlock: bool(r.new_block), gap: bool(r.gap),
           heading: r.heading, headingKind: r.heading_kind, subscription: r.subscription,
         })),
+    get_cross_refs: ({ translation, book, chapter, verse }) => {
+      const split = (k) => [Math.floor(k / 1e6), Math.floor(k / 1e3) % 1e3, k % 1e3];
+      const text = db.prepare(`SELECT text FROM verses WHERE translation = ? AND book = ? AND (chapter, verse) >= (?, ?)
+        AND (chapter, verse) <= (?, ?) ORDER BY chapter, verse LIMIT 3`);
+      return db.prepare("SELECT dst, dst_end, votes FROM cross_refs WHERE src = ? ORDER BY votes DESC, dst, dst_end")
+        .all(book * 1e6 + chapter * 1e3 + verse).map((r) => {
+          const [b, c, v] = split(r.dst), [, ec, ev] = split(r.dst_end);
+          return { book: b, chapter: c, verse: v, endChapter: ec, endVerse: ev, votes: r.votes,
+            text: text.all(translation, b, c, v, ec, ev).map((t) => t.text).join(" ") };
+        });
+    },
     get_word_tags: ({ translation, book, chapter }) => {
       const rows = db.prepare(`SELECT v.verse, t.start_at AS start, t.end_at AS end, t.num
         FROM verses v JOIN word_tags t ON t.verse_id = v.id

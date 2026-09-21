@@ -13,11 +13,13 @@ interface Props {
   onNote: () => void;
   onBookmark: () => void;
   onCopy: () => void;
+  /** Opens the cross-references; null when they don't apply (more than one verse is selected). */
+  onRefs: (() => void) | null;
   onClear: () => void;
 }
 
 /** The toolbar that appears over the reading page while verses are selected. */
-export function SelectionBar({ label, color, hasNote, bookmarked, copied, onColor, onNote, onBookmark, onCopy, onClear }: Props) {
+export function SelectionBar({ label, color, hasNote, bookmarked, copied, onColor, onNote, onBookmark, onCopy, onRefs, onClear }: Props) {
   return (
     <div className="selbar" role="toolbar" aria-label={`Actions for ${label}`} onMouseDown={(e) => e.preventDefault()}>
       <span className="selbar-label">{label}</span>
@@ -45,6 +47,11 @@ export function SelectionBar({ label, color, hasNote, bookmarked, copied, onColo
       <button className="selbar-action" onClick={onCopy}>
         {copied ? "Copied" : "Copy"}
       </button>
+      {onRefs && (
+        <button className="selbar-action" onClick={onRefs} title="Cross-references (X)">
+          Cross-references
+        </button>
+      )}
       <button className="selbar-action selbar-close" onClick={onClear} aria-label="Clear selection" title="Clear selection (Esc)">
         ×
       </button>

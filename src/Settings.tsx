@@ -19,6 +19,7 @@ const SHORTCUTS: [string[], string][] = [
   [["B", "N", "C"], "Bookmark, add a note, or copy the selection"],
   [["1", "2", "3", "4", "5"], "Highlight the selection in a color"],
   [["W", "Shift+W"], "Open the next or previous word's meaning"],
+  [["X"], "Cross-references for the selected verse (or the one the cursor is on)"],
   [["S"], "Turn original-language words (Hebrew and Greek) on or off"],
   [["Enter"], "With such a word's card open: list every verse that uses it"],
   [["Esc"], "Close a card or clear the selection"],
@@ -222,7 +223,8 @@ export function Settings({
             <h2 className="set-heading">Sources</h2>
             <p className="set-about">
               The King James text and its Strong’s numbers are from eBible.org (public domain). Strong’s dictionary is by
-              James Strong (1890, 1894); its JSON edition is by Open Scriptures, licensed CC BY-SA.
+              James Strong (1890, 1894); its JSON edition is by Open Scriptures, licensed CC BY-SA. Cross-references are from
+              OpenBible.info (CC BY), drawn mostly from the public-domain Treasury of Scripture Knowledge.
             </p>
           </section>
 

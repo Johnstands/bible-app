@@ -61,6 +61,56 @@ function loadStrongs() {
   return rows;
 }
 
+/** A verse as one number: book, chapter and verse, so references sort and compare in Bible order. */
+const verseKey = (book, chapter, verse) => book * 1_000_000 + chapter * 1_000 + verse;
+// OpenBible's book codes are the abbreviations above without the space ("1Sam").
+const CODE_TO_BOOK = new Map(BOOKS.map(([, , abbrev], i) => [abbrev.replace(/ /g, ""), i + 1]));
+
+/**
+ * Loads OpenBible.info's cross-references (CC BY; mostly the Treasury of Scripture Knowledge, with a community
+ * vote for how useful each one is) as rows {src, dst, dstEnd, votes}. A reference is kept when it has at least
+ * MIN_VOTES votes or is one of its verse's TOP_KEPT best, so every verse that has any keeps its best few and the
+ * long tail of one- and two-vote pairs is left out. A target can be a range ("Rom.1.19-Rom.1.20").
+ * Verses the KJV merges (15-16) resolve to the row that holds them; references to verses it lacks are dropped.
+ */
+const MIN_VOTES = 3, TOP_KEPT = 5;
+function loadCrossRefs(db) {
+  const file = path.join(ROOT, "data/sources/crossrefs/cross_references.txt");
+  if (!fs.existsSync(file)) throw new Error(`Missing ${file} - run npm run data:fetch first`);
+  const rowOf = new Map();
+  for (const r of db.prepare("SELECT book, chapter, verse, verse_end FROM verses").all())
+    for (let v = r.verse; v <= (r.verse_end ?? r.verse); v++) rowOf.set(verseKey(r.book, r.chapter, v), verseKey(r.book, r.chapter, r.verse));
+  const key = (s) => {
+    const [code, chapter, verse] = s.split(".");
+    const book = CODE_TO_BOOK.get(code);
+    if (!book) throw new Error(`Unknown book code "${code}" in the cross-references`);
+    return verseKey(book, +chapter, +verse);
+  };
+
+  const bySource = new Map();
+  let dropped = 0;
+  for (const line of fs.readFileSync(file, "utf8").split("\n").slice(1)) {
+    if (!line.trim()) continue;
+    const [from, to, votesText] = line.split("\t");
+    const votes = +votesText;
+    if (!(votes >= 1)) continue; // downvoted or unrated
+    const [first, last = first] = to.split("-");
+    const src = rowOf.get(key(from)), dst = rowOf.get(key(first));
+    if (src === undefined || dst === undefined) { dropped++; continue; }
+    let dstEnd = rowOf.get(key(last)) ?? dst;
+    if (dstEnd < dst) dstEnd = dst;
+    if (dst === src && dstEnd === dst) continue;
+    if (!bySource.has(src)) bySource.set(src, []);
+    bySource.get(src).push({ src, dst, dstEnd, votes });
+  }
+  const rows = [];
+  for (const refs of bySource.values()) {
+    refs.sort((a, b) => b.votes - a.votes);
+    refs.forEach((r, i) => { if (r.votes >= MIN_VOTES || i < TOP_KEPT) rows.push(r); });
+  }
+  return { rows, dropped, verses: bySource.size };
+}
+
 const ENTITIES = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" };
 const decode = (s) =>
   s.replace(/&(?:#(\d+)|#x([0-9a-f]+)|(\w+));/gi, (m, dec, hex, name) =>
@@ -251,6 +301,15 @@ db.exec(`
     def TEXT NOT NULL,                -- Strong's entry: origin, then meaning
     kjv TEXT                          -- Strong's list of the KJV renderings
   ) WITHOUT ROWID;
+  -- Cross-references, best first. src, dst and dst_end are book*1000000 + chapter*1000 + verse; dst_end is dst
+  -- unless the target is a range, and may then be in a later chapter.
+  CREATE TABLE cross_refs (
+    src INTEGER NOT NULL,
+    votes INTEGER NOT NULL,
+    dst INTEGER NOT NULL,
+    dst_end INTEGER NOT NULL,
+    PRIMARY KEY (src, votes DESC, dst, dst_end)
+  ) WITHOUT ROWID;
   CREATE VIRTUAL TABLE verses_fts USING fts5(
     text, content = 'verses', content_rowid = 'id', tokenize = 'porter unicode61 remove_diacritics 2'
   );
@@ -292,6 +351,13 @@ db.exec("COMMIT");
 db.exec("CREATE INDEX word_tags_num ON word_tags (num, verse_id)");
 console.log(`Strong's: ${strongs.length} dictionary entries, ${db.prepare("SELECT COUNT(*) AS n FROM word_tags").get().n} tagged phrases`);
 
+const xrefs = loadCrossRefs(db);
+const insRef = db.prepare("INSERT OR IGNORE INTO cross_refs (src, votes, dst, dst_end) VALUES (?, ?, ?, ?)");
+db.exec("BEGIN");
+for (const r of xrefs.rows) insRef.run(r.src, r.votes, r.dst, r.dstEnd);
+db.exec("COMMIT");
+console.log(`Cross-references: ${xrefs.rows.length} kept for ${xrefs.verses} verses (${xrefs.dropped} pointed at verses the KJV lacks)`);
+
 db.exec("INSERT INTO verses_fts(rowid, text) SELECT id, text FROM verses");
 db.exec("INSERT INTO verses_fts(verses_fts) VALUES ('optimize')");
 db.exec("CREATE INDEX verses_ref ON verses (book, chapter, verse)");
@@ -319,6 +385,14 @@ const known = new Set(strongs.map((r) => r.num));
 const unknown = [...new Set(tagRows.map((r) => r.num).filter((n) => !known.has(n)))];
 if (unknown.length) console.log(`Note: ${unknown.length} tagged numbers are not in the dictionary: ${unknown.slice(0, 12).join(", ")}${unknown.length > 12 ? ", …" : ""}`);
 if (tagRows.length < 300000) bad(`only ${tagRows.length} word tags; the source has about 349,000`);
+
+// Cross-references: nearly every verse should have some, and none should point at a verse that isn't there.
+const covered = db.prepare("SELECT COUNT(DISTINCT src) AS n FROM cross_refs").get().n;
+if (covered < 25000) bad(`only ${covered} verses have cross-references; expected about 29,000`);
+const existing = new Set(db.prepare("SELECT book, chapter, verse FROM verses").all().map((v) => verseKey(v.book, v.chapter, v.verse)));
+const missing = db.prepare("SELECT src, dst, dst_end FROM cross_refs").all()
+  .filter((r) => !existing.has(r.src) || !existing.has(r.dst) || !existing.has(r.dst_end)).length;
+if (missing) bad(`${missing} cross-references point at a verse that does not exist`);
 
 db.exec("VACUUM");
 db.close();

@@ -9,6 +9,8 @@ import type { Neighbor, Target } from "./Chapter";
 import { buildIndex, parseGlossary } from "./glossary";
 import { GoTo } from "./GoTo";
 import type { Destination } from "./GoTo";
+import { CrossReferences } from "./CrossReferences";
+import type { RefSource } from "./CrossReferences";
 import { Library } from "./Library";
 import { adjacent, chapterTitle } from "./nav";
 import type { Position } from "./nav";
@@ -46,7 +48,7 @@ function keepInView(el: Element | null) {
 }
 
 /** The full-screen panels. Only one is open at a time. */
-type Panel = "goto" | "search" | "settings" | "library" | "votd";
+type Panel = "goto" | "search" | "settings" | "library" | "votd" | "refs";
 const DEFAULT_POSITION: Position = { book: 1, chapter: 1 };
 
 interface SavedPosition extends Position {
@@ -113,6 +115,7 @@ function App() {
   const [selected, setSelected] = useState<ReadonlySet<number>>(new Set());
   const anchor = useRef<number | null>(null); // where a shift-click range starts
   const [note, setNote] = useState<NoteDraft | null>(null);
+  const [refsFor, setRefsFor] = useState<(RefSource & { label: string; text: string }) | null>(null);
   const [copied, setCopied] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -394,6 +397,19 @@ function App() {
     if (loaded) void attempt(toggleBookmark(loaded.book, loaded.chapter, chosen[0]));
   };
 
+  /** Opens the cross-references for the one selected verse, or for the verse the keyboard is on. */
+  const openRefs = () => {
+    if (!loaded || !ready) return;
+    const verse = chosen.length === 1 ? chosen[0] : chosen.length === 0 && cursor ? cursor.verse : null;
+    if (verse === null) {
+      announce("Select one verse, or move to it with J and K, then press X for its cross-references.");
+      return;
+    }
+    const text = loaded.verses.find((v) => v.verse === verse)?.text ?? "";
+    setRefsFor({ book: loaded.book, chapter: loaded.chapter, verse, label: referenceLabel(title, loaded.chapter, [verse]), text });
+    show("refs");
+  };
+
   const copySelection = () => {
     if (!loaded) return;
     navigator.clipboard
@@ -546,6 +562,10 @@ function App() {
         searchNumber(openNum);
         return;
       }
+      if (e.key === "x" || e.key === "X") {
+        openRefs();
+        return;
+      }
       if (e.key === "s" || e.key === "S") {
         const on = !settings.originalWords;
         setSettings({ ...settings, originalWords: on });
@@ -653,6 +673,7 @@ function App() {
             onNote={() => openNote()}
             onBookmark={bookmarkSelection}
             onCopy={copySelection}
+            onRefs={chosen.length === 1 ? openRefs : null}
             onClear={clearSelection}
           />
         </div>
@@ -712,6 +733,17 @@ function App() {
         />
       )}
       {panel === "library" && books.length > 0 && <Library books={books} onGo={navigate} onClose={closePanel} />}
+      {panel === "refs" && refsFor && books.length > 0 && (
+        <CrossReferences
+          books={books}
+          translation={TRANSLATION}
+          source={refsFor}
+          sourceLabel={refsFor.label}
+          sourceText={refsFor.text}
+          onGo={navigate}
+          onClose={closePanel}
+        />
+      )}
       {panel === "votd" && books.length > 0 && (
         <VerseOfTheDay books={books} date={today} onGo={navigate} onClose={closePanel} />
       )}
