@@ -47,6 +47,14 @@ The app asks `https://github.com/Johnstands/bible-app/releases/latest/download/l
 for a *published* release (not a draft), and only when the release has a `latest.json` asset, which the Release
 workflow creates when the signing secrets are set. Settings shows "Couldn't check for updates" if it can't be reached.
 
+## The AppImage on newer distributions
+
+The AppImage bundles Wayland and epoxy libraries built for Ubuntu. On a newer system (Arch, for one) they clash with
+the system's Mesa and WebKit aborts with `EGL_BAD_ALLOC`. `src-tauri/src/syslibs.rs` avoids this: when running from an
+AppImage it restarts itself once with the system's copies preloaded. It does nothing outside an AppImage, or when the
+system has none of those libraries. To check it after a release, run the AppImage plainly (no `LD_PRELOAD`):
+`APPIMAGE_EXTRACT_AND_RUN=1 ./bible-app_*.AppImage` on a machine without FUSE.
+
 ## What is checked on every push
 
 The **CI** workflow runs the type check, the unit tests, the Rust tests (including the 100 ms search bar in a release

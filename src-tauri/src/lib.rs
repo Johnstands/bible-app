@@ -1,5 +1,6 @@
 mod commands;
 mod db;
+mod syslibs;
 mod user;
 
 use rusqlite::Connection;
@@ -13,6 +14,7 @@ pub struct AppState {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    syslibs::prefer_system_libs();
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         // Reopen at the size, position and maximised state the window was closed with.
