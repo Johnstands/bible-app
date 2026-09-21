@@ -19,8 +19,8 @@ const bridge = `
 `;
 
 // `motion: "reduce"` turns the app's animations off, so screenshots never catch a fade half-done.
-export async function launch({ width = 1000, height = 820, scheme = "light", motion = "no-preference" } = {}) {
-  const server = serve();
+export async function launch({ width = 1000, height = 820, scheme = "light", motion = "no-preference", update = null } = {}) {
+  const server = serve(9100, { update });
   const browser = await chromium.launch({ executablePath: CHROMIUM, args: ["--no-sandbox"] });
   const context = await browser.newContext({ viewport: { width, height }, colorScheme: scheme, reducedMotion: motion, deviceScaleFactor: 1.5 });
   await context.addInitScript(bridge);
@@ -31,15 +31,18 @@ export async function launch({ width = 1000, height = 820, scheme = "light", mot
   return {
     page, errors,
     /**
-     * `settings` and `position` seed localStorage before the app starts. The verse of the day is off
-     * unless a scene asks for it, because its card would cover the page on a fresh profile.
+     * Loads the app with `settings` and `position` already saved, as if it had been used before. They are written
+     * once and the page is reloaded, so a later reload keeps whatever the app itself saved. The verse of the day is
+     * off unless a scene asks for it, because its card would cover the page on a fresh profile.
      */
     open: async ({ settings, position } = {}) => {
-      await context.addInitScript(([s, p]) => {
+      await page.goto(APP_URL);
+      await page.evaluate(([s, p]) => {
+        localStorage.clear();
         localStorage.setItem("settings", JSON.stringify(s));
         if (p) localStorage.setItem("position", JSON.stringify(p));
       }, [{ verseOfTheDay: false, ...settings }, position]);
-      await page.goto(APP_URL);
+      await page.reload();
       await page.waitForSelector(".chapter");
     },
     close: async () => { await browser.close(); server.close(); },

@@ -15,6 +15,11 @@ pub struct AppState {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        // Reopen at the size, position and maximised state the window was closed with.
+        .plugin(tauri_plugin_window_state::Builder::default().build())
+        // Checks GitHub Releases for a newer signed build; the app decides when to ask (see src/updater.ts).
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .setup(|app| {
             let bible_path = app
                 .path()

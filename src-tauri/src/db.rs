@@ -235,10 +235,12 @@ pub fn search(
 
     let mut stmt = conn.prepare_cached(&format!(
         "SELECT v.translation, v.book, b.name, v.chapter, v.verse,
-                snippet(verses_fts, 0, char(1), char(2), '…', 32)
+                snippet(verses_fts, 0, char({start}), char({end}), '…', 32)
          {SEARCH_FROM_WHERE}
          ORDER BY verses_fts.rank
-         LIMIT ?5 OFFSET ?6"
+         LIMIT ?5 OFFSET ?6",
+        start = MATCH_START as u32,
+        end = MATCH_END as u32,
     ))?;
     let rows = stmt.query_map(params![q, filter.translation, filter.testament, filter.book, limit, offset], |r| {
         Ok(SearchHit {

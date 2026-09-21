@@ -27,14 +27,32 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
-    "resources": ["resources/bible.db"],
+    "targets": [
+      "deb",
+      "appimage"
+    ],
+    "resources": [
+      "resources/bible.db"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "category": "Education",
+    "shortDescription": "An offline King James Bible reader",
+    "longDescription": "A quiet, offline reader for the King James Version. Search, highlight, bookmark and add notes, and get help with archaic words and words whose meaning has changed since 1611.",
+    "copyright": "The King James Version text is in the public domain.",
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEVEQkY5NjI0REVBOEE2RUUKUldUdXBxamVKSmEvN2VKMW1QTzM5YThuY0FYVVNEN3dvaXpDUnVaNEpaV1dnZEZGOFZnMU11VzEK",
+      "endpoints": [
+        "https://github.com/Johnstands/bible-app/releases/latest/download/latest.json"
+      ]
+    }
   }
 }

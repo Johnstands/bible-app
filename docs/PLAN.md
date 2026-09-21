@@ -70,10 +70,19 @@ Purpose: help a modern reader understand the KJV. Words that are archaic, or tha
 - Cross-references (needs a separate public-domain data source) and a copy or share verse card.
 - Optional: audio, or Strong's and lexicon data.
 
-## Phase 6: Polish and ship (2-3 days)
+## Phase 6: Polish and ship (done, apart from the optional title bar)
 - App icon, window state, accessibility pass.
 - Tests: Rust unit tests for the DB layer, Playwright for the UI flows. `scripts/ui` already drives the UI headlessly against a mock backend, so it is the starting point.
 - Bundle with `tauri build` (AppImage, deb, and others), and set up the auto-updater.
+- **Result:**
+  - **Keyboard:** `J`/`K` move a verse cursor, `Space` selects, `Shift+J`/`K` extend, `B`/`N`/`C` bookmark, note and copy, `1`-`5` highlight, and `W`/`Shift+W` step through the glossary words. A live region reads each action out. The shortcuts are listed in Settings.
+  - **Accessibility:** the page behind a dialog is inert, dialogs give focus back when they close, lists use the right ARIA patterns (combobox, listbox, tabs), and muted text was darkened to pass WCAG AA in all three themes. axe-core reports nothing on any screen in any theme, and a test keeps it that way, along with a unit test for the theme contrast ratios.
+  - **Icon:** an open book with the gold diamond ornament from the chapter headings, on the oxblood of the accent color (`assets/icon.svg`, rendered by `scripts/make-icon.mjs`, sizes made with `tauri icon`).
+  - **Window:** size, position and maximised state are remembered (`tauri-plugin-window-state`).
+  - **UI tests:** `npm run test:ui` drives the real interface in headless Chromium against a mock backend (57 tests: flows, keyboard, accessibility, updates). CI runs it with everything else.
+  - **Packaging:** `npm run tauri build` makes a `.deb` and an AppImage for Linux. The release build was run and checked: it finds its bundled Bible, fonts and icon.
+  - **Updates:** the app checks GitHub Releases when it opens (and from Settings), offers a newer signed version in a quiet banner, and installs it on request. A tagged push builds a draft release (`docs/RELEASING.md`).
+- **Not done:** a custom title bar (the system one is dark and clashes with the paper theme); Windows and macOS builds; the release workflow has not been run on GitHub yet, so the first real release is its first test.
 
 ## Risks
 - **Licensing:** stick to public domain until you have licenses for modern translations.

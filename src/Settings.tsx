@@ -3,11 +3,34 @@ import {
   clampScale, DEFAULT_SETTINGS, FONT_SCALE, FONTS, THEME_LABELS, THEMES, WORD_HELP_LABELS, WORD_HELP_LEVELS,
 } from "./settings";
 import type { FontFamily, Settings as SettingsValue } from "./settings";
+import { useReturnFocus } from "./useReturnFocus";
+
+// [keys, what they do]
+const SHORTCUTS: [string[], string][] = [
+  [["/"], "Go to a book, chapter or verse (also Ctrl+K)"],
+  [["Ctrl+F"], "Search"],
+  [["Ctrl+L"], "Library of bookmarks, notes and highlights"],
+  [["Ctrl+,"], "Settings"],
+  [["←", "→"], "Previous or next chapter"],
+  [["J", "K"], "Move down or up through the verses"],
+  [["Space"], "Select or unselect the verse"],
+  [["Shift+J", "Shift+K"], "Extend the selection"],
+  [["B", "N", "C"], "Bookmark, add a note, or copy the selection"],
+  [["1", "2", "3", "4", "5"], "Highlight the selection in a color"],
+  [["W", "Shift+W"], "Open the next or previous word's meaning"],
+  [["Esc"], "Close a card or clear the selection"],
+];
 
 interface Props {
   settings: SettingsValue;
   onChange: (settings: SettingsValue) => void;
   onShowVerse: () => void;
+  /** The running app's version, if it can be read. */
+  version: string | null;
+  updateStatus: "idle" | "checking" | "current" | "available" | "installing" | "failed";
+  updateVersion: string | null;
+  onCheckUpdates: () => void;
+  onInstallUpdate: () => void;
   onClose: () => void;
 }
 
@@ -33,14 +56,16 @@ function Switch({ label, hint, checked, onChange }: SwitchProps) {
 }
 
 /** Changes apply as you make them, so the page behind the panel is the preview. */
-export function Settings({ settings, onChange, onShowVerse, onClose }: Props) {
+export function Settings({
+  settings, onChange, onShowVerse, version, updateStatus, updateVersion, onCheckUpdates, onInstallUpdate, onClose,
+}: Props) {
   const panelRef = useRef<HTMLDivElement>(null);
   const set = (patch: Partial<SettingsValue>) => onChange({ ...settings, ...patch });
 
+  useReturnFocus();
+
   useEffect(() => {
-    const opener = document.activeElement as HTMLElement | null;
     panelRef.current?.querySelector<HTMLElement>("[aria-pressed='true']")?.focus();
-    return () => opener?.focus?.();
   }, []);
 
   const onKeyDown = (e: React.KeyboardEvent) => {
@@ -160,6 +185,44 @@ export function Settings({ settings, onChange, onShowVerse, onClose }: Props) {
             <button className="set-link" onClick={onShowVerse}>
               Show today’s verse
             </button>
+          </section>
+          <section className="set-section">
+            <h2 className="set-heading">Updates</h2>
+            <p className="set-about">
+              {version ? `You have version ${version}. ` : ""}
+              <span role="status">
+                {updateStatus === "checking" && "Checking…"}
+                {updateStatus === "current" && "This is the latest version."}
+                {updateStatus === "failed" && "Couldn’t check for updates. Are you online?"}
+                {updateStatus === "available" && `Version ${updateVersion} is available.`}
+                {updateStatus === "installing" && "Installing…"}
+              </span>
+            </p>
+            {updateStatus === "available" ? (
+              <button className="set-link" onClick={onInstallUpdate}>
+                Install and restart
+              </button>
+            ) : (
+              <button className="set-link" onClick={onCheckUpdates} disabled={updateStatus === "checking" || updateStatus === "installing"}>
+                Check for updates
+              </button>
+            )}
+          </section>
+
+          <section className="set-section">
+            <h2 className="set-heading">Keyboard</h2>
+            <dl className="shortcuts">
+              {SHORTCUTS.map(([keys, what]) => (
+                <div key={what}>
+                  <dt>
+                    {keys.map((k) => (
+                      <kbd key={k}>{k}</kbd>
+                    ))}
+                  </dt>
+                  <dd>{what}</dd>
+                </div>
+              ))}
+            </dl>
           </section>
         </div>
         <div className="goto-footer">

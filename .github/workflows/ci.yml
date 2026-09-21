@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24 # the data build uses node:sqlite
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - name: System libraries for Tauri
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+      - run: npm ci
+      - name: Build the Bible database
+        run: |
+          npm run data:fetch
+          npm run data:build
+      - run: npx tsc --noEmit
+      - run: npm test
+      - name: Rust tests, and the search speed bar in a release build
+        run: |
+          cargo test --manifest-path src-tauri/Cargo.toml
+          cargo test --release --manifest-path src-tauri/Cargo.toml search_is_fast
+      - name: UI tests (headless Chrome against a mock backend)
+        run: npm run test:ui
+        env:
+          CHROMIUM: /usr/bin/google-chrome

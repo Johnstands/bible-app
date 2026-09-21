@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- The app's own colors: oxblood ground, paper-cream pages, gold ornament. -->
+  <rect width="1024" height="1024" rx="232" fill="#7a2e2e"/>
+  <rect x="34" y="34" width="956" height="956" rx="204" fill="none" stroke="#c9a45c" stroke-opacity="0.45" stroke-width="7"/>
+
+  <g transform="translate(0 36)">
+  <!-- The ornament from the chapter headings: a diamond on a hairline. -->
+  <g fill="none" stroke="#c9a45c" stroke-width="7" stroke-linecap="round">
+    <path d="M292 244H446M578 244H732"/>
+  </g>
+  <path d="M512 188L568 244L512 300L456 244Z" fill="#c9a45c"/>
+
+  <!-- An open book, its two pages meeting at a narrow spine. -->
+  <path d="M500 392C420 350 296 340 190 376V752C296 716 420 726 500 770Z" fill="#faf6ec"/>
+  <path d="M524 392C604 350 728 340 834 376V752C728 716 604 726 524 770Z" fill="#faf6ec"/>
+  <!-- Lines of text, quiet enough to disappear at small sizes. -->
+  <g stroke="#7a2e2e" stroke-opacity="0.32" stroke-width="12" stroke-linecap="round" fill="none">
+    <path d="M250 470C320 448 390 448 448 468M250 542C320 520 390 520 448 540M250 614C320 592 390 592 448 612M250 686C310 668 360 668 404 682"/>
+    <path d="M576 468C634 448 704 448 774 470M576 540C634 520 704 520 774 542M576 612C634 592 704 592 774 614M620 682C664 668 714 668 774 686"/>
+  </g>
+  </g>
+</svg>

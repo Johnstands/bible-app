@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useReturnFocus } from "./useReturnFocus";
 
 export interface NoteDraft {
   book: number;
@@ -25,12 +26,12 @@ export function NoteEditor({ draft, onSave, onDelete, onClose }: Props) {
   const [body, setBody] = useState(draft.body);
   const ref = useRef<HTMLTextAreaElement>(null);
 
+  useReturnFocus();
+
   useEffect(() => {
-    const opener = document.activeElement as HTMLElement | null;
     const box = ref.current;
     box?.focus();
     box?.setSelectionRange(box.value.length, box.value.length);
-    return () => opener?.focus?.();
   }, []);
 
   const onKeyDown = (e: React.KeyboardEvent) => {

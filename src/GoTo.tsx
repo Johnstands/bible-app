@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { Book } from "./api";
 import { chapterTitle } from "./nav";
 import type { Position } from "./nav";
 import { parseReference } from "./reference";
+import { useReturnFocus } from "./useReturnFocus";
 
 export interface Destination extends Position {
   verse?: number;
@@ -32,11 +33,13 @@ export function GoTo({ books, current, onGo, onSearch, onClose }: Props) {
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const uid = useId();
+  const listId = `${uid}-list`;
+
+  useReturnFocus();
 
   useEffect(() => {
-    const opener = document.activeElement as HTMLElement | null;
     inputRef.current?.focus();
-    return () => opener?.focus?.();
   }, []);
 
   const rows = useMemo<Row[]>(() => {
@@ -109,13 +112,16 @@ export function GoTo({ books, current, onGo, onSearch, onClose }: Props) {
   };
 
   const renderBooks = (testament: "OT" | "NT", heading: string) => (
-    <>
-      <div className="goto-group">{heading}</div>
+    <div role="group" aria-labelledby={`${uid}-${testament}`}>
+      <div className="goto-group" id={`${uid}-${testament}`}>
+        {heading}
+      </div>
       {books
         .filter((b) => b.testament === testament)
         .map((b) => (
           <button
             key={b.id}
+            id={`${uid}-book-${b.id}`}
             role="option"
             aria-selected={b.id === browsed}
             className="goto-row"
@@ -126,8 +132,11 @@ export function GoTo({ books, current, onGo, onSearch, onClose }: Props) {
             {b.name}
           </button>
         ))}
-    </>
+    </div>
   );
+
+  // The input drives whichever list is showing, and says which entry is current.
+  const activeId = browsing ? `${uid}-book-${browsed}` : rows[active] ? `${uid}-row-${active}` : undefined;
 
   return (
     <div className="scrim" onMouseDown={onClose}>
@@ -146,16 +155,21 @@ export function GoTo({ books, current, onGo, onSearch, onClose }: Props) {
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Go to… John 3:16, 1 Cor 13, Ps 23"
           aria-label="Go to a book, chapter or verse"
+          role="combobox"
+          aria-expanded="true"
+          aria-controls={listId}
+          aria-autocomplete="list"
+          aria-activedescendant={activeId}
           spellCheck={false}
           autoComplete="off"
         />
         {browsing ? (
           <div className="goto-browse">
-            <div className="goto-books" role="listbox" aria-label="Books" ref={listRef}>
+            <div className="goto-books" role="listbox" id={listId} aria-label="Books" ref={listRef} tabIndex={0}>
               {renderBooks("OT", "Old Testament")}
               {renderBooks("NT", "New Testament")}
             </div>
-            <div className="goto-chapters" aria-label={`${browsedBook?.name} chapters`}>
+            <div className="goto-chapters" role="group" aria-label={`${browsedBook?.name} chapters`}>
               {Array.from({ length: browsedBook?.chapters ?? 0 }, (_, i) => i + 1).map((n) => (
                 <button
                   key={n}
@@ -169,10 +183,11 @@ export function GoTo({ books, current, onGo, onSearch, onClose }: Props) {
             </div>
           </div>
         ) : (
-          <div className="goto-results" role="listbox" ref={listRef}>
+          <div className="goto-results" role="listbox" id={listId} aria-label="Matches" ref={listRef} tabIndex={0}>
             {rows.map((row, i) => (
               <button
                 key={row.label}
+                id={`${uid}-row-${i}`}
                 role="option"
                 aria-selected={i === active}
                 disabled={!row.go && !row.search}

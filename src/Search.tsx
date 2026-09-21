@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { search } from "./api";
 import type { Book, SearchHit, SearchResults, SearchScope } from "./api";
 import type { Destination } from "./GoTo";
 import { splitMarks } from "./highlight";
 import { chapterTitle } from "./nav";
+import { useReturnFocus } from "./useReturnFocus";
 
 const PAGE_SIZE = 50;
 const DEBOUNCE_MS = 120;
@@ -35,12 +36,13 @@ export function Search({ books, initial, onRemember, onGo, onClose }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const request = useRef(0); // lets a slow response for an older query be ignored
+  const uid = useId();
+
+  useReturnFocus();
 
   useEffect(() => {
-    const opener = document.activeElement as HTMLElement | null;
     inputRef.current?.focus();
     inputRef.current?.select();
-    return () => opener?.focus?.();
   }, []);
 
   useEffect(() => onRemember({ query, scope }), [query, scope, onRemember]);
@@ -123,6 +125,11 @@ export function Search({ books, initial, onRemember, onGo, onClose }: Props) {
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search the Bible… love, or “in the beginning”"
           aria-label="Search the Bible"
+          role="combobox"
+          aria-expanded={hits.length > 0}
+          aria-controls={`${uid}-hits`}
+          aria-autocomplete="list"
+          aria-activedescendant={hits[active] ? `${uid}-hit-${active}` : undefined}
           spellCheck={false}
           autoComplete="off"
         />
@@ -158,7 +165,7 @@ export function Search({ books, initial, onRemember, onGo, onClose }: Props) {
           </span>
         </div>
 
-        <div className="search-results" role="listbox" ref={listRef}>
+        <div className="search-results" ref={listRef} tabIndex={0} aria-label="Search results">
           {error && <p className="goto-empty">Search failed: {error}</p>}
           {!error && !trimmed && (
             <p className="goto-empty">Search the King James Bible. Put words in quotes to find an exact phrase.</p>
@@ -166,28 +173,33 @@ export function Search({ books, initial, onRemember, onGo, onClose }: Props) {
           {!error && trimmed && results && hits.length === 0 && (
             <p className="goto-empty">No verses match “{trimmed}”.</p>
           )}
-          {hits.map((hit, i) => (
-            <button
-              key={`${hit.book}-${hit.chapter}-${hit.verse}`}
-              role="option"
-              aria-selected={i === active}
-              className="hit"
-              tabIndex={-1}
-              onClick={() => go(hit)}
-              onMouseMove={() => setActive(i)}
-            >
-              <span className="hit-ref">
-                {bookName(hit.book)} {hit.chapter}:{hit.verse}
-              </span>
-              <span className="hit-text">
-                {splitMarks(hit.snippet).map((seg, j) =>
-                  seg.match ? <mark key={j}>{seg.text}</mark> : seg.text,
-                )}
-              </span>
-            </button>
-          ))}
+          {hits.length > 0 && (
+            <div role="listbox" id={`${uid}-hits`} aria-label="Matching verses">
+              {hits.map((hit, i) => (
+                <button
+                  key={`${hit.book}-${hit.chapter}-${hit.verse}`}
+                  id={`${uid}-hit-${i}`}
+                  role="option"
+                  aria-selected={i === active}
+                  className="hit"
+                  tabIndex={-1}
+                  onClick={() => go(hit)}
+                  onMouseMove={() => setActive(i)}
+                >
+                  <span className="hit-ref">
+                    {bookName(hit.book)} {hit.chapter}:{hit.verse}
+                  </span>
+                  <span className="hit-text">
+                    {splitMarks(hit.snippet).map((seg, j) =>
+                      seg.match ? <mark key={j}>{seg.text}</mark> : seg.text,
+                    )}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
           {canLoadMore && (
-            <button className="hit-more" tabIndex={-1} onClick={loadMore}>
+            <button className="hit-more" onClick={loadMore}>
               Show more
             </button>
           )}

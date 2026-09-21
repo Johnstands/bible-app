@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
-import { EMPTY_MARKS, getChapter, getMarks, listBooks, saveNote, setHighlight, toggleBookmark } from "./api";
+import { EMPTY_MARKS, getChapter, getMarks, HIGHLIGHT_COLORS, listBooks, saveNote, setHighlight, toggleBookmark } from "./api";
 import type { Book, ChapterMarks, HighlightColor, Verse } from "./api";
 import glossaryText from "../data/glossary.txt?raw";
 import { TRANSLATION } from "./config";
@@ -22,11 +22,27 @@ import { Settings } from "./Settings";
 import { applySettings, loadSettings, saveSettings } from "./settings";
 import { loadJson, saveJson } from "./storage";
 import { quotation, referenceLabel, span } from "./verses";
+import { appVersion, findUpdate } from "./updater";
+import type { UpdateOffer } from "./updater";
 import { VerseOfTheDay } from "./VerseOfTheDay";
 import { WordHelp } from "./WordHelp";
 import { hasSeenVerseToday, markVerseSeen } from "./votd";
+import { KIND_LABELS } from "./glossary";
 
 const IDLE_MS = 2500;
+/** Wait this long after the first chapter appears before asking about updates, so startup stays quick. */
+const UPDATE_CHECK_DELAY_MS = 2500;
+
+type UpdateStatus = "idle" | "checking" | "current" | "available" | "installing" | "failed";
+/** How far below the top of the window text is hidden by the fixed top bar. */
+const TOPBAR_CLEARANCE = 90;
+
+/** Scrolls `el` to the middle of the window unless it is already comfortably on screen. */
+function keepInView(el: Element | null) {
+  if (!el) return;
+  const r = el.getBoundingClientRect();
+  if (r.top < TOPBAR_CLEARANCE || r.bottom > window.innerHeight - TOPBAR_CLEARANCE) el.scrollIntoView({ block: "center" });
+}
 
 /** The full-screen panels. Only one is open at a time. */
 type Panel = "goto" | "search" | "settings" | "library" | "votd";
@@ -93,6 +109,15 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [settings, setSettings] = useState(loadSettings);
   const [help, setHelp] = useState<{ entry: GlossaryEntry; word: string; anchor: HTMLElement } | null>(null);
+  // The verse the keyboard is on. `shown` is false after a mouse click, so the outline only appears for keyboard users.
+  const [cursor, setCursor] = useState<{ verse: number; shown: boolean } | null>(null);
+  const [announcement, setAnnouncement] = useState<{ text: string; id: number } | null>(null);
+  const [update, setUpdate] = useState<UpdateOffer | null>(null);
+  const [updateStatus, setUpdateStatus] = useState<UpdateStatus>("idle");
+  const [updateDismissed, setUpdateDismissed] = useState(false);
+  const [version, setVersion] = useState<string | null>(null);
+  const announceId = useRef(0);
+  const announce = useCallback((text: string) => setAnnouncement({ text, id: ++announceId.current }), []);
   const jumpId = useRef(0);
   const restoreScroll = useRef<number | null>(saved.current.scroll);
   const idle = useIdle(IDLE_MS);
@@ -148,6 +173,7 @@ function App() {
     setSelected(new Set());
     anchor.current = null;
     setHelp(null);
+    setCursor(null);
   }, [loaded?.book, loaded?.chapter]);
 
   // The glossary needs the book list to resolve its verse references. A bad entry must not take the reader down.
@@ -189,6 +215,39 @@ function App() {
     const timer = window.setTimeout(() => setNotice(null), 4000);
     return () => clearTimeout(timer);
   }, [notice]);
+
+  // ---- Updates: checked once when the app opens, and whenever asked for in Settings ----
+
+  const checkForUpdate = useCallback(async () => {
+    setUpdateStatus("checking");
+    try {
+      const offer = await findUpdate();
+      setUpdate(offer);
+      setUpdateStatus(offer ? "available" : "current");
+    } catch {
+      setUpdateStatus("failed");
+    }
+  }, []);
+
+  const installUpdate = async () => {
+    if (!update) return;
+    setUpdateStatus("installing");
+    try {
+      await update.install(); // restarts the app when it succeeds
+    } catch (e) {
+      setUpdateStatus("failed");
+      setNotice(`The update couldn’t be installed: ${e}`);
+    }
+  };
+
+  const checkedOnLaunch = useRef(false);
+  useEffect(() => {
+    void appVersion().then(setVersion);
+    if (checkedOnLaunch.current || !ready) return;
+    checkedOnLaunch.current = true;
+    const timer = window.setTimeout(() => void checkForUpdate(), UPDATE_CHECK_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [ready, checkForUpdate]);
 
   // Once a day, the first time the app opens with the chapter on screen.
   const today = useRef(new Date()).current;
@@ -247,25 +306,31 @@ function App() {
     anchor.current = null;
   };
 
-  const onVerseClick = (verse: number, e: React.MouseEvent) => {
-    const modified = e.shiftKey || e.ctrlKey || e.metaKey;
-    // Shift-click natively extends the text selection, which would look like a drag; drop it.
-    // Otherwise ignore the tail of a real text selection (dragging, double-click) so copying words still works.
-    if (modified) window.getSelection()?.removeAllRanges();
-    else if (window.getSelection()?.toString()) return;
+  /** Replaces the selection with one verse, adds or removes a verse, or extends the selection from where it began. */
+  const changeSelection = (verse: number, how: "replace" | "toggle" | "extend") => {
     setSelected((prev) => {
-      if (e.shiftKey && anchor.current !== null) {
+      if (how === "extend" && anchor.current !== null) {
         const [lo, hi] = [anchor.current, verse].sort((a, b) => a - b);
         return new Set(Array.from({ length: hi - lo + 1 }, (_, i) => lo + i));
       }
-      if (e.ctrlKey || e.metaKey) {
+      if (how === "toggle") {
         const next = new Set(prev);
         if (!next.delete(verse)) next.add(verse);
         return next;
       }
       return prev.size === 1 && prev.has(verse) ? new Set() : new Set([verse]);
     });
-    if (!e.shiftKey) anchor.current = verse;
+    if (how !== "extend") anchor.current = verse;
+  };
+
+  const onVerseClick = (verse: number, e: React.MouseEvent) => {
+    const modified = e.shiftKey || e.ctrlKey || e.metaKey;
+    // Shift-click natively extends the text selection, which would look like a drag; drop it.
+    // Otherwise ignore the tail of a real text selection (dragging, double-click) so copying words still works.
+    if (modified) window.getSelection()?.removeAllRanges();
+    else if (window.getSelection()?.toString()) return;
+    changeSelection(verse, e.shiftKey ? "extend" : e.ctrlKey || e.metaKey ? "toggle" : "replace");
+    setCursor({ verse, shown: false });
   };
 
   const chosen = [...selected].sort((a, b) => a - b);
@@ -332,6 +397,84 @@ function App() {
     setNote(null);
   };
 
+  // ---- Keyboard: a verse cursor, and stepping through the glossary words ----
+
+  const verseNumbers = loaded?.verses.map((v) => v.verse) ?? [];
+  const verseText = (n: number) => loaded?.verses.find((v) => v.verse === n)?.text ?? "";
+
+  const moveCursor = (dir: 1 | -1, extend: boolean) => {
+    if (!ready || verseNumbers.length === 0) return;
+    let target: number;
+    if (cursor === null) {
+      // Start on the first verse that is on screen.
+      const onScreen = verseNumbers.find((n) => {
+        const el = document.querySelector(`[data-verse="${n}"]`);
+        return el ? el.getBoundingClientRect().bottom > TOPBAR_CLEARANCE : false;
+      });
+      target = onScreen ?? verseNumbers[0];
+    } else {
+      const i = verseNumbers.indexOf(cursor.verse) + dir;
+      if (i < 0 || i >= verseNumbers.length) {
+        announce(dir > 0 ? "End of the chapter." : "Start of the chapter.");
+        return;
+      }
+      target = verseNumbers[i];
+    }
+    if (extend) {
+      if (anchor.current === null) anchor.current = cursor?.verse ?? target;
+      changeSelection(target, "extend");
+    }
+    setCursor({ verse: target, shown: true });
+    announce(`Verse ${target}. ${verseText(target)}`);
+  };
+
+  const toggleAtCursor = () => {
+    if (!cursor) return;
+    const was = selected.has(cursor.verse);
+    changeSelection(cursor.verse, "toggle");
+    setCursor({ verse: cursor.verse, shown: true });
+    const count = selected.size + (was ? -1 : 1);
+    announce(`Verse ${cursor.verse} ${was ? "unselected" : "selected"}. ${count} ${count === 1 ? "verse" : "verses"} selected.`);
+  };
+
+  /** Opens the card for the next (or previous) underlined word in the chapter, wrapping around. */
+  const stepWord = (dir: 1 | -1) => {
+    const words = [...document.querySelectorAll<HTMLElement>(".kjv-word")];
+    if (words.length === 0) {
+      announce("This chapter has no word help.");
+      return;
+    }
+    const current = help ? words.indexOf(help.anchor) : -1;
+    let i: number;
+    if (current >= 0) i = (current + dir + words.length) % words.length;
+    else if (dir > 0) i = Math.max(0, words.findIndex((w) => w.getBoundingClientRect().top > TOPBAR_CLEARANCE));
+    else {
+      // Going backwards from nothing: the last word above the visible text, or the chapter's last word.
+      i = words.length - 1;
+      for (let j = words.length - 1; j >= 0; j--) {
+        if (words[j].getBoundingClientRect().top < TOPBAR_CLEARANCE) {
+          i = j;
+          break;
+        }
+      }
+    }
+    const el = words[i];
+    keepInView(el);
+    el.click(); // the click handler opens the card, exactly as a mouse click would
+  };
+
+  // The cursor stays in view as it moves, clear of the top bar and the selection bar.
+  useEffect(() => {
+    if (cursor?.shown) keepInView(document.querySelector(`[data-verse="${cursor.verse}"]`));
+  }, [cursor]);
+
+  // Words opened from the keyboard are read out too.
+  useEffect(() => {
+    if (!help) return;
+    const { entry, word } = help;
+    announce(`${word}, ${KIND_LABELS[entry.kind]}: ${entry.meaning}.${entry.today ? ` Today: ${entry.today}.` : ""}`);
+  }, [help, announce]);
+
   // One stable listener that calls the latest handler. Re-registering per render would drop keys:
   // the first key after the top bar idles re-renders mid-event and removes the handler before it runs.
   const onKeyRef = useRef<(e: KeyboardEvent) => void>(() => {});
@@ -363,13 +506,28 @@ function App() {
       if (e.ctrlKey || e.metaKey || e.altKey || typing || overlayOpen) return;
       if (e.key === "Escape") {
         if (help) setHelp(null);
-        else clearSelection();
+        else {
+          clearSelection();
+          setCursor(null);
+        }
       }
       else if (e.key === "/") {
         e.preventDefault();
         openGoto();
       } else if (e.key === "ArrowLeft" && prev) navigate({ ...prev.pos });
       else if (e.key === "ArrowRight" && next) navigate({ ...next.pos });
+      else if (e.key === "j" || e.key === "k" || e.key === "J" || e.key === "K") {
+        moveCursor(e.key.toLowerCase() === "j" ? 1 : -1, e.shiftKey);
+      } else if ((e.key === " " || e.key === "Enter") && cursor && !(e.target instanceof HTMLButtonElement)) {
+        e.preventDefault();
+        toggleAtCursor();
+      } else if (e.key === "w" || e.key === "W") stepWord(e.shiftKey ? -1 : 1);
+      else if (chosen.length > 0) {
+        if (e.key === "b") bookmarkSelection();
+        else if (e.key === "n") openNote();
+        else if (e.key === "c") copySelection();
+        else if (/^[1-5]$/.test(e.key)) applyColor(HIGHLIGHT_COLORS[+e.key - 1]);
+      }
     };
   });
   useEffect(() => {
@@ -380,73 +538,97 @@ function App() {
 
   return (
     <>
-      <header className={`topbar${idle && !overlayOpen ? " is-idle" : ""}`}>
-        <button className="location" onClick={openGoto} title="Go to… (Ctrl+K or /)">
-          {book ? label(pos) : ""}
-        </button>
-        <div className="topbar-right">
-          <button className="topbar-button" onClick={openLibrary} title="Library: bookmarks, notes and highlights (Ctrl+L)">
-            Library
+      {/* While a dialog is open the page behind it can't be focused or read: the dialog is all there is. */}
+      <div className="app-shell" inert={overlayOpen}>
+        <header className={`topbar${idle && !overlayOpen ? " is-idle" : ""}`}>
+          <button className="location" onClick={openGoto} title="Go to… (Ctrl+K or /)">
+            {book ? label(pos) : ""}
           </button>
-          <button className="topbar-button" onClick={() => openSearch()} title="Search (Ctrl+F)">
-            Search
-          </button>
-          <button className="topbar-button topbar-type" onClick={openSettings} title="Settings (Ctrl+,)" aria-label="Settings">
-            Aa
-          </button>
-          <span className="translation" title="King James Version">
-            {TRANSLATION}
-          </span>
-        </div>
-      </header>
-
-      <main
-        className="page"
-        onClick={(e) => {
-          // Clicking the margin or between verses puts the selection away.
-          if (!(e.target as HTMLElement).closest(".verse, button")) clearSelection();
-        }}
-      >
-        {error && <p className="status">Couldn’t load this chapter: {error}</p>}
-        {shown && loaded && !error && (
-          <div key={`${loaded.book}-${loaded.chapter}`} className="settle">
-            <Chapter
-              book={shown}
-              chapter={loaded.chapter}
-              verses={loaded.verses}
-              marks={loaded.marks}
-              selected={selected}
-              target={ready ? target : null}
-              layout={settings}
-              glossary={glossary}
-              prev={prev}
-              next={next}
-              onNavigate={(p) => navigate({ ...p })}
-              onVerseClick={onVerseClick}
-              onOpenNote={openNote}
-              onWordClick={showWord}
-            />
+          <div className="topbar-right">
+            <button className="topbar-button" onClick={openLibrary} title="Library: bookmarks, notes and highlights (Ctrl+L)">
+              Library
+            </button>
+            <button className="topbar-button" onClick={() => openSearch()} title="Search (Ctrl+F)">
+              Search
+            </button>
+            <button className="topbar-button topbar-type" onClick={openSettings} title="Settings (Ctrl+,)" aria-label="Settings">
+              Aa
+            </button>
+            <span className="translation" title="King James Version">
+              {TRANSLATION}
+            </span>
           </div>
-        )}
-      </main>
+        </header>
+
+        <main
+          className="page"
+          onClick={(e) => {
+            // Clicking the margin or between verses puts the selection away.
+            if (!(e.target as HTMLElement).closest(".verse, button")) clearSelection();
+          }}
+        >
+          {error && <p className="status">Couldn’t load this chapter: {error}</p>}
+          {shown && loaded && !error && (
+            <div key={`${loaded.book}-${loaded.chapter}`} className="settle">
+              <Chapter
+                book={shown}
+                chapter={loaded.chapter}
+                verses={loaded.verses}
+                marks={loaded.marks}
+                selected={selected}
+                cursor={cursor?.shown ? cursor.verse : null}
+                target={ready ? target : null}
+                layout={settings}
+                glossary={glossary}
+                prev={prev}
+                next={next}
+                onNavigate={(p) => navigate({ ...p })}
+                onVerseClick={onVerseClick}
+                onOpenNote={openNote}
+                onWordClick={showWord}
+              />
+            </div>
+          )}
+        </main>
+      </div>
 
       {ready && chosen.length > 0 && !overlayOpen && (
-        <SelectionBar
-          label={referenceLabel(title, loaded.chapter, chosen)}
-          color={sharedColor}
-          hasNote={marks.notes.some((n) => n.verse === chosen[0])}
-          bookmarked={marks.bookmarks.includes(chosen[0])}
-          copied={copied}
-          onColor={applyColor}
-          onNote={() => openNote()}
-          onBookmark={bookmarkSelection}
-          onCopy={copySelection}
-          onClear={clearSelection}
-        />
+        <div role="region" aria-label="Verse actions">
+          <SelectionBar
+            label={referenceLabel(title, loaded.chapter, chosen)}
+            color={sharedColor}
+            hasNote={marks.notes.some((n) => n.verse === chosen[0])}
+            bookmarked={marks.bookmarks.includes(chosen[0])}
+            copied={copied}
+            onColor={applyColor}
+            onNote={() => openNote()}
+            onBookmark={bookmarkSelection}
+            onCopy={copySelection}
+            onClear={clearSelection}
+          />
+        </div>
       )}
 
       {help && !overlayOpen && (
-        <WordHelp entry={help.entry} word={help.word} anchor={help.anchor} onClose={closeHelp} />
+        <div role="region" aria-label="Word meaning">
+          <WordHelp entry={help.entry} word={help.word} anchor={help.anchor} onClose={closeHelp} />
+        </div>
+      )}
+
+      <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {announcement && <span key={announcement.id}>{announcement.text}</span>}
+      </div>
+
+      {update && !updateDismissed && !overlayOpen && updateStatus !== "current" && (
+        <div className="update-banner" role="region" aria-label="Update available">
+          <span>{updateStatus === "installing" ? "Installing the update…" : `Version ${update.version} is available.`}</span>
+          <button onClick={() => void installUpdate()} disabled={updateStatus === "installing"}>
+            Install and restart
+          </button>
+          <button onClick={() => setUpdateDismissed(true)} disabled={updateStatus === "installing"}>
+            Later
+          </button>
+        </div>
       )}
 
       {notice && (
@@ -468,7 +650,17 @@ function App() {
         />
       )}
       {panel === "settings" && (
-        <Settings settings={settings} onChange={setSettings} onShowVerse={() => setPanel("votd")} onClose={closePanel} />
+        <Settings
+          settings={settings}
+          onChange={setSettings}
+          onShowVerse={() => setPanel("votd")}
+          version={version}
+          updateStatus={updateStatus}
+          updateVersion={update?.version ?? null}
+          onCheckUpdates={() => void checkForUpdate()}
+          onInstallUpdate={() => void installUpdate()}
+          onClose={closePanel}
+        />
       )}
       {panel === "library" && books.length > 0 && <Library books={books} onGo={navigate} onClose={closePanel} />}
       {panel === "votd" && books.length > 0 && (

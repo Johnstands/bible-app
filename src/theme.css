@@ -3,7 +3,7 @@
 [data-theme="paper"] {
   --bg: #faf6ec;
   --ink: #2a2622;
-  --ink-muted: #7a7163;
+  --ink-muted: #736a5d;
   --rule: #ddd2b9;
   --accent: #7a2e2e;
   --gold: #b08d4a;
@@ -13,7 +13,7 @@
 [data-theme="sepia"] {
   --bg: #f0e4cc;
   --ink: #3b2f22;
-  --ink-muted: #76664e;
+  --ink-muted: #6e5f49;
   --rule: #d2bf9a;
   --accent: #7a2e2e;
   --gold: #9a7534;

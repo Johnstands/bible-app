@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useId, useLayoutEffect, useRef, useState } from "react";
 import { KIND_LABELS } from "./glossary";
 import type { GlossaryEntry } from "./glossary";
 
@@ -18,7 +18,14 @@ const SCROLL_GRACE_MS = 300;
 /** A small card next to an underlined word: what it meant in the KJV and, for false friends, what it means now. */
 export function WordHelp({ entry, word, anchor, onClose }: Props) {
   const ref = useRef<HTMLDivElement>(null);
+  const id = useId();
   const [place, setPlace] = useState<{ left: number; top: number } | null>(null);
+
+  // The underlined word is described by the card while it is open.
+  useLayoutEffect(() => {
+    anchor.setAttribute("aria-describedby", id);
+    return () => anchor.removeAttribute("aria-describedby");
+  }, [anchor, id]);
 
   // Place it under the word (over it if there is no room), kept inside the window.
   useLayoutEffect(() => {
@@ -58,9 +65,9 @@ export function WordHelp({ entry, word, anchor, onClose }: Props) {
   return (
     <div
       ref={ref}
+      id={id}
       className="wordhelp"
-      role="dialog"
-      aria-label={`Meaning of ${word}`}
+      role="tooltip"
       data-kind={entry.kind}
       style={{ left: place?.left ?? 0, top: place?.top ?? 0, visibility: place ? "visible" : "hidden" }}
     >

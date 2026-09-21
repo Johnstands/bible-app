@@ -7,6 +7,7 @@ import { chapterTitle } from "./nav";
 import { parseReference } from "./reference";
 import { referenceLabel } from "./verses";
 import { verseRefFor } from "./votd";
+import { useReturnFocus } from "./useReturnFocus";
 
 interface Props {
   books: Book[];
@@ -27,10 +28,10 @@ export function VerseOfTheDay({ books, date, onGo, onClose }: Props) {
   const [failed, setFailed] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
+  useReturnFocus();
+
   useEffect(() => {
-    const opener = document.activeElement as HTMLElement | null;
     panelRef.current?.focus();
-    return () => opener?.focus?.();
   }, []);
 
   useEffect(() => {

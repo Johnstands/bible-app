@@ -14,7 +14,7 @@ const ftsQuery = (q) => {
   return words.length ? words.map((w, i) => (i === words.length - 1 ? `"${w}"*` : `"${w}"`)).join(" ") : null;
 };
 
-export function createBackend() {
+export function createBackend({ update = null } = {}) {
   const marks = { highlights: new Map(), notes: [], bookmarks: new Set(), nextId: 1 };
   const key = (b, c, v) => `${b}:${c}:${v}`;
   const parse = (k) => k.split(":").map(Number);
@@ -23,6 +23,10 @@ export function createBackend() {
       .all(book, chapter, verse, end ?? verse).map((r) => r.text).join(" ");
 
   const commands = {
+    // The updater and app-version commands that Tauri's plugins call.
+    "plugin:app|version": () => "0.1.0",
+    "plugin:updater|check": () =>
+      update ? { rid: 1, currentVersion: "0.1.0", version: update.version, date: null, body: update.notes ?? null, rawJson: {} } : null,
     list_translations: () => db.prepare("SELECT id, name FROM translations").all(),
     list_books: () => db.prepare("SELECT id, code, name, abbrev, testament, chapters FROM books ORDER BY id").all(),
     get_chapter: ({ translation, book, chapter }) =>
@@ -87,8 +91,8 @@ export function createBackend() {
 }
 
 /** Serves the commands as POST /invoke {cmd, args}. Returns the http.Server. */
-export function serve(port = 9100) {
-  const commands = createBackend();
+export function serve(port = 9100, options = {}) {
+  const commands = createBackend(options);
   const server = http.createServer((req, res) => {
     const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "content-type" };
     if (req.method === "OPTIONS") return res.writeHead(204, cors).end();

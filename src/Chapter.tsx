@@ -59,6 +59,8 @@ interface Props {
   verses: Verse[];
   marks: ChapterMarks;
   selected: ReadonlySet<number>;
+  /** The verse the keyboard is on, shown with an outline. */
+  cursor: number | null;
   target: Target | null;
   layout: Layout;
   /** Archaic words and false friends to underline; null until the books are known. */
@@ -72,7 +74,7 @@ interface Props {
 }
 
 export function Chapter({
-  book, chapter, verses, marks, selected, target, layout, glossary, prev, next,
+  book, chapter, verses, marks, selected, cursor, target, layout, glossary, prev, next,
   onNavigate, onVerseClick, onOpenNote, onWordClick,
 }: Props) {
   const items = toItems(verses);
@@ -120,7 +122,9 @@ export function Chapter({
 
   const renderVerse = (v: Verse, pilcrow: boolean) => {
     const hit = target !== null && v.verse >= target.verse && v.verse <= target.end;
-    const classes = ["verse", hit && "is-target", selected.has(v.verse) && "is-selected"].filter(Boolean).join(" ");
+    const classes = ["verse", hit && "is-target", selected.has(v.verse) && "is-selected", cursor === v.verse && "is-cursor"]
+      .filter(Boolean)
+      .join(" ");
     return (
       <span
         key={hit ? `${v.verse}-${target.id}` : v.verse}
