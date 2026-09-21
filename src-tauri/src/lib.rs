@@ -1,5 +1,6 @@
 mod commands;
 mod db;
+mod user;
 
 use rusqlite::Connection;
 use std::sync::Mutex;
@@ -22,7 +23,7 @@ pub fn run() {
             std::fs::create_dir_all(&data_dir)?;
             app.manage(AppState {
                 bible: Mutex::new(db::open_bible(&bible_path)?),
-                user: Mutex::new(db::open_user(&data_dir.join("user.db"))?),
+                user: Mutex::new(user::open(&data_dir.join("user.db"))?),
             });
             Ok(())
         })
@@ -31,6 +32,12 @@ pub fn run() {
             commands::list_books,
             commands::get_chapter,
             commands::search,
+            commands::get_marks,
+            commands::set_highlight,
+            commands::save_note,
+            commands::delete_note,
+            commands::toggle_bookmark,
+            commands::get_library,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

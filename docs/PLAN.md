@@ -36,10 +36,25 @@
 - **Done when:** search returns results in well under 100 ms.
 - **Result:** the Search panel (`Ctrl+F` or the top-bar button) searches as you type, with stemming ("love" also finds "loved"), exact phrases in quotes, filters for the whole Bible, either testament or one book, highlighted matches, a total count, "Show more" paging, and Enter or click to jump to the verse. The Go-to panel offers a "Search for" row for anything typed, and the last query and filters are remembered. Release-build timing: 42 ms for the worst case ("the", 27k matches), under 10 ms for everything else (`cargo test --release`).
 
-## Phase 4: Personalization (2-3 days)
+## Phase 4: Personalization (done)
 - Verse selection, then highlight colors, notes and bookmarks.
-- Themes (light, dark, sepia) and font size and family settings.
+- Settings panel (`Ctrl+,` or from the top bar):
+  - Themes (paper, sepia, dark), replacing the temporary `t` key.
+  - Font size control (a slider or steps, with a live preview) and font family.
+  - **Text features:**
+    - **Verse by verse** (toggle): each verse on its own line instead of flowing paragraphs. Poetry stays as it is.
+    - **Pilcrows** (toggle): show a ¶ at the start of each paragraph, as in the 1611 text. The import already records paragraph starts (`new_block`), so this needs no data change.
+  - Settings are saved and applied on launch.
 - A verse of the day.
+- **Result:**
+  - **Selecting:** click a verse to select it, shift-click for a range, Ctrl-click to add or remove one, and Esc or a click in the margin to clear. A floating bar offers five highlight colors (click the active color again to remove it), Note, Bookmark and Copy (a quotation with its reference).
+  - **Marks in the text:** highlights are washes of color, a bookmark is a small ribbon and a note is a small diamond you can click to reopen it.
+  - **Notes:** one note per starting verse, which may cover a range.
+  - **Library** (`Ctrl+L`): bookmarks, notes and highlights in one panel with verse text and dates, click to jump, × to remove.
+  - **Settings** (`Ctrl+,` or "Aa"): themes, three bundled fonts, size from 85% to 160% with a live preview, and the verse-by-verse and pilcrow toggles. Verse by verse and pilcrows work together, so a ¶ marks where each paragraph starts even on one-verse lines.
+  - **Verse of the day:** a curated list of 370 references (checked against the Bible in a test), one per day of the year, shown once per day on launch and available from Settings.
+  - **Data:** `user.db` migrates in place (version 2 adds note ranges and one note per verse), with Rust tests for each behavior including the upgrade.
+- **Follow-ups for Phase 6:** verses can only be selected with the mouse, so selection needs a keyboard path; the Library needs a screen-reader pass.
 
 ## Phase 5: Depth features (3-5 days)
 - Reading plans with progress tracking.
@@ -48,7 +63,7 @@
 
 ## Phase 6: Polish and ship (2-3 days)
 - App icon, window state, accessibility pass.
-- Tests: Rust unit tests for the DB layer, Playwright for the UI flows.
+- Tests: Rust unit tests for the DB layer, Playwright for the UI flows. `scripts/ui` already drives the UI headlessly against a mock backend, so it is the starting point.
 - Bundle with `tauri build` (AppImage, deb, and others), and set up the auto-updater.
 
 ## Risks

@@ -1,0 +1,413 @@
+//! The writable per-user DB: highlights, notes and bookmarks.
+//!
+//! Verses are referenced as (book, chapter, verse) with no translation, so a mark follows the
+//! reader if more translations are ever added.
+
+use crate::db::{Error, Result};
+use rusqlite::{params, Connection};
+use serde::Serialize;
+use std::path::Path;
+
+pub const HIGHLIGHT_COLORS: [&str; 5] = ["yellow", "green", "blue", "pink", "purple"];
+
+// Each entry migrates the DB one version forward; `PRAGMA user_version` records how far it got.
+const MIGRATIONS: &[&str] = &[
+    "
+    CREATE TABLE bookmarks (
+        id INTEGER PRIMARY KEY,
+        book INTEGER NOT NULL,
+        chapter INTEGER NOT NULL,
+        verse INTEGER NOT NULL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (book, chapter, verse)
+    );
+    CREATE TABLE highlights (
+        id INTEGER PRIMARY KEY,
+        book INTEGER NOT NULL,
+        chapter INTEGER NOT NULL,
+        verse INTEGER NOT NULL,
+        color TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (book, chapter, verse)
+    );
+    CREATE TABLE notes (
+        id INTEGER PRIMARY KEY,
+        book INTEGER NOT NULL,
+        chapter INTEGER NOT NULL,
+        verse INTEGER NOT NULL,
+        body TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX notes_ref ON notes (book, chapter, verse);
+    ",
+    // One note per starting verse, which may span a range of verses.
+    "
+    ALTER TABLE notes ADD COLUMN verse_end INTEGER;
+    DROP INDEX notes_ref;
+    CREATE UNIQUE INDEX notes_verse ON notes (book, chapter, verse);
+    ",
+];
+
+/// Opens (creating and migrating if needed) the user DB.
+pub fn open(path: &Path) -> Result<Connection> {
+    let conn = Connection::open(path)?;
+    migrate(&conn)?;
+    Ok(conn)
+}
+
+fn migrate(conn: &Connection) -> Result<()> {
+    let version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
+    for (i, sql) in MIGRATIONS.iter().enumerate().skip(version as usize) {
+        let tx = conn.unchecked_transaction()?;
+        tx.execute_batch(sql)?;
+        tx.pragma_update(None, "user_version", i as i64 + 1)?;
+        tx.commit()?;
+    }
+    Ok(())
+}
+
+#[derive(Debug, PartialEq, Serialize)]
+pub struct Highlight {
+    pub verse: u32,
+    pub color: String,
+}
+
+#[derive(Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Note {
+    pub id: i64,
+    pub verse: u32,
+    pub verse_end: Option<u32>,
+    pub body: String,
+    pub updated_at: String,
+}
+
+/// Everything the reader draws on top of one chapter.
+#[derive(Debug, Default, PartialEq, Serialize)]
+pub struct ChapterMarks {
+    pub highlights: Vec<Highlight>,
+    pub notes: Vec<Note>,
+    pub bookmarks: Vec<u32>,
+}
+
+pub fn chapter_marks(conn: &Connection, book: u32, chapter: u32) -> Result<ChapterMarks> {
+    let highlights = conn
+        .prepare_cached("SELECT verse, color FROM highlights WHERE book = ?1 AND chapter = ?2 ORDER BY verse")?
+        .query_map(params![book, chapter], |r| Ok(Highlight { verse: r.get(0)?, color: r.get(1)? }))?
+        .collect::<rusqlite::Result<_>>()?;
+    let notes = conn
+        .prepare_cached(
+            "SELECT id, verse, verse_end, body, updated_at FROM notes
+             WHERE book = ?1 AND chapter = ?2 ORDER BY verse",
+        )?
+        .query_map(params![book, chapter], note_from_row)?
+        .collect::<rusqlite::Result<_>>()?;
+    let bookmarks = conn
+        .prepare_cached("SELECT verse FROM bookmarks WHERE book = ?1 AND chapter = ?2 ORDER BY verse")?
+        .query_map(params![book, chapter], |r| r.get(0))?
+        .collect::<rusqlite::Result<_>>()?;
+    Ok(ChapterMarks { highlights, notes, bookmarks })
+}
+
+fn note_from_row(r: &rusqlite::Row) -> rusqlite::Result<Note> {
+    Ok(Note { id: r.get(0)?, verse: r.get(1)?, verse_end: r.get(2)?, body: r.get(3)?, updated_at: r.get(4)? })
+}
+
+/// Highlights each verse in `verses` with `color`, or clears their highlights when `color` is `None`.
+pub fn set_highlight(conn: &Connection, book: u32, chapter: u32, verses: &[u32], color: Option<&str>) -> Result<()> {
+    if let Some(c) = color {
+        if !HIGHLIGHT_COLORS.contains(&c) {
+            return Err(Error::Invalid(format!("unknown highlight color {c:?}")));
+        }
+    }
+    let tx = conn.unchecked_transaction()?;
+    for verse in verses {
+        match color {
+            Some(c) => tx.execute(
+                "INSERT INTO highlights (book, chapter, verse, color) VALUES (?1, ?2, ?3, ?4)
+                 ON CONFLICT (book, chapter, verse) DO UPDATE SET color = excluded.color",
+                params![book, chapter, verse, c],
+            )?,
+            None => tx.execute(
+                "DELETE FROM highlights WHERE book = ?1 AND chapter = ?2 AND verse = ?3",
+                params![book, chapter, verse],
+            )?,
+        };
+    }
+    tx.commit()?;
+    Ok(())
+}
+
+/// Creates or updates the note starting at `verse`. An empty body deletes it and returns `None`.
+pub fn save_note(
+    conn: &Connection,
+    book: u32,
+    chapter: u32,
+    verse: u32,
+    verse_end: Option<u32>,
+    body: &str,
+) -> Result<Option<Note>> {
+    let body = body.trim();
+    if body.is_empty() {
+        conn.execute(
+            "DELETE FROM notes WHERE book = ?1 AND chapter = ?2 AND verse = ?3",
+            params![book, chapter, verse],
+        )?;
+        return Ok(None);
+    }
+    let verse_end = verse_end.filter(|&end| end > verse);
+    conn.execute(
+        "INSERT INTO notes (book, chapter, verse, verse_end, body) VALUES (?1, ?2, ?3, ?4, ?5)
+         ON CONFLICT (book, chapter, verse) DO UPDATE
+         SET body = excluded.body, verse_end = excluded.verse_end, updated_at = CURRENT_TIMESTAMP",
+        params![book, chapter, verse, verse_end, body],
+    )?;
+    Ok(Some(conn.query_row(
+        "SELECT id, verse, verse_end, body, updated_at FROM notes WHERE book = ?1 AND chapter = ?2 AND verse = ?3",
+        params![book, chapter, verse],
+        note_from_row,
+    )?))
+}
+
+pub fn delete_note(conn: &Connection, id: i64) -> Result<()> {
+    conn.execute("DELETE FROM notes WHERE id = ?1", params![id])?;
+    Ok(())
+}
+
+/// Adds the bookmark if the verse has none, removes it if it does. Returns whether it is now bookmarked.
+pub fn toggle_bookmark(conn: &Connection, book: u32, chapter: u32, verse: u32) -> Result<bool> {
+    let removed = conn.execute(
+        "DELETE FROM bookmarks WHERE book = ?1 AND chapter = ?2 AND verse = ?3",
+        params![book, chapter, verse],
+    )?;
+    if removed > 0 {
+        return Ok(false);
+    }
+    conn.execute("INSERT INTO bookmarks (book, chapter, verse) VALUES (?1, ?2, ?3)", params![book, chapter, verse])?;
+    Ok(true)
+}
+
+/// One row of the Library: a place in the Bible plus the reader's mark on it.
+#[derive(Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LibraryEntry {
+    pub id: i64,
+    pub book: u32,
+    pub chapter: u32,
+    pub verse: u32,
+    pub verse_end: Option<u32>,
+    /// The verse text, so the Library can show what was marked.
+    pub text: String,
+    /// The highlight color (highlights only).
+    pub color: Option<String>,
+    /// The note text (notes only).
+    pub body: Option<String>,
+    /// UTC, `YYYY-MM-DD HH:MM:SS`.
+    pub at: String,
+}
+
+#[derive(Debug, Default, PartialEq, Serialize)]
+pub struct Library {
+    pub bookmarks: Vec<LibraryEntry>,
+    pub notes: Vec<LibraryEntry>,
+    /// Consecutive verses with the same color are merged into one entry.
+    pub highlights: Vec<LibraryEntry>,
+}
+
+/// Everything the reader has marked. `text_of(book, chapter, verse, verse_end)` supplies verse text.
+pub fn library(conn: &Connection, text_of: &dyn Fn(u32, u32, u32, Option<u32>) -> String) -> Result<Library> {
+    let entry = |id, book, chapter, verse, verse_end, color, body, at| LibraryEntry {
+        id, book, chapter, verse, verse_end, color, body, at,
+        text: text_of(book, chapter, verse, verse_end),
+    };
+
+    let bookmarks = conn
+        .prepare("SELECT id, book, chapter, verse, created_at FROM bookmarks ORDER BY created_at DESC, id DESC")?
+        .query_map([], |r| Ok(entry(r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, None, None, None, r.get(4)?)))?
+        .collect::<rusqlite::Result<_>>()?;
+
+    let notes = conn
+        .prepare("SELECT id, book, chapter, verse, verse_end, body, updated_at FROM notes ORDER BY updated_at DESC, id DESC")?
+        .query_map([], |r| {
+            Ok(entry(r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, None, Some(r.get(5)?), r.get(6)?))
+        })?
+        .collect::<rusqlite::Result<_>>()?;
+
+    let mut runs: Vec<(i64, u32, u32, u32, u32, String, String)> = Vec::new(); // id, book, chapter, first, last, color, at
+    let mut stmt = conn.prepare("SELECT id, book, chapter, verse, color, created_at FROM highlights ORDER BY book, chapter, verse")?;
+    for row in stmt.query_map([], |r| {
+        Ok((r.get::<_, i64>(0)?, r.get::<_, u32>(1)?, r.get::<_, u32>(2)?, r.get::<_, u32>(3)?, r.get::<_, String>(4)?, r.get::<_, String>(5)?))
+    })? {
+        let (id, book, chapter, verse, color, at) = row?;
+        match runs.last_mut() {
+            Some(run) if run.1 == book && run.2 == chapter && run.4 + 1 == verse && run.5 == color => run.4 = verse,
+            _ => runs.push((id, book, chapter, verse, verse, color, at)),
+        }
+    }
+    let highlights = runs
+        .into_iter()
+        .map(|(id, book, chapter, first, last, color, at)| {
+            entry(id, book, chapter, first, Some(last).filter(|&l| l > first), Some(color), None, at)
+        })
+        .collect();
+
+    Ok(Library { bookmarks, notes, highlights })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const JOHN: u32 = 43;
+
+    /// A fresh user DB in its own temp directory, removed on drop.
+    struct TempDb {
+        dir: std::path::PathBuf,
+    }
+
+    impl TempDb {
+        fn new(name: &str) -> Self {
+            let dir = std::env::temp_dir().join(format!("bible-app-{name}-{}", std::process::id()));
+            let _ = std::fs::remove_dir_all(&dir);
+            std::fs::create_dir_all(&dir).unwrap();
+            TempDb { dir }
+        }
+        fn path(&self) -> std::path::PathBuf {
+            self.dir.join("user.db")
+        }
+    }
+
+    impl Drop for TempDb {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.dir);
+        }
+    }
+
+    fn version(conn: &Connection) -> i64 {
+        conn.query_row("PRAGMA user_version", [], |r| r.get(0)).unwrap()
+    }
+
+    #[test]
+    fn migrates_once_and_keeps_data() {
+        let tmp = TempDb::new("migrate");
+        {
+            let conn = open(&tmp.path()).unwrap();
+            assert_eq!(version(&conn), MIGRATIONS.len() as i64);
+            toggle_bookmark(&conn, JOHN, 3, 16).unwrap();
+        }
+        let conn = open(&tmp.path()).unwrap();
+        assert_eq!(chapter_marks(&conn, JOHN, 3).unwrap().bookmarks, [16]);
+    }
+
+    #[test]
+    fn upgrades_a_version_1_database_in_place() {
+        // What the app created before notes could span verses.
+        let tmp = TempDb::new("upgrade");
+        {
+            let conn = Connection::open(tmp.path()).unwrap();
+            conn.execute_batch(MIGRATIONS[0]).unwrap();
+            conn.pragma_update(None, "user_version", 1).unwrap();
+            conn.execute("INSERT INTO notes (book, chapter, verse, body) VALUES (43, 3, 16, 'old note')", []).unwrap();
+        }
+        let conn = open(&tmp.path()).unwrap();
+        assert_eq!(version(&conn), MIGRATIONS.len() as i64);
+        let notes = chapter_marks(&conn, JOHN, 3).unwrap().notes;
+        assert_eq!((notes.len(), notes[0].body.as_str(), notes[0].verse_end), (1, "old note", None));
+    }
+
+    #[test]
+    fn highlights_set_recolor_and_clear_per_verse() {
+        let tmp = TempDb::new("highlights");
+        let conn = open(&tmp.path()).unwrap();
+        set_highlight(&conn, JOHN, 3, &[16, 17, 18], Some("yellow")).unwrap();
+        set_highlight(&conn, JOHN, 3, &[17], Some("blue")).unwrap();
+        set_highlight(&conn, JOHN, 4, &[1], Some("green")).unwrap();
+
+        let colors = |chapter| -> Vec<(u32, String)> {
+            chapter_marks(&conn, JOHN, chapter).unwrap().highlights.into_iter().map(|h| (h.verse, h.color)).collect()
+        };
+        assert_eq!(colors(3), [(16, "yellow".into()), (17, "blue".into()), (18, "yellow".into())]);
+        assert_eq!(colors(4), [(1, "green".into())]);
+
+        set_highlight(&conn, JOHN, 3, &[16, 17], None).unwrap();
+        assert_eq!(colors(3), [(18, "yellow".into())]);
+    }
+
+    #[test]
+    fn rejects_unknown_highlight_colors_without_changing_anything() {
+        let tmp = TempDb::new("badcolor");
+        let conn = open(&tmp.path()).unwrap();
+        assert!(matches!(set_highlight(&conn, JOHN, 3, &[16], Some("chartreuse")), Err(Error::Invalid(_))));
+        assert!(chapter_marks(&conn, JOHN, 3).unwrap().highlights.is_empty());
+    }
+
+    #[test]
+    fn notes_upsert_trim_and_delete_when_emptied() {
+        let tmp = TempDb::new("notes");
+        let conn = open(&tmp.path()).unwrap();
+
+        let first = save_note(&conn, JOHN, 3, 16, Some(18), "  God's love  ").unwrap().unwrap();
+        assert_eq!((first.body.as_str(), first.verse, first.verse_end), ("God's love", 16, Some(18)));
+
+        // Saving again edits the same note rather than adding a second one.
+        let again = save_note(&conn, JOHN, 3, 16, None, "Edited").unwrap().unwrap();
+        assert_eq!((again.id, again.body.as_str(), again.verse_end), (first.id, "Edited", None));
+        assert_eq!(chapter_marks(&conn, JOHN, 3).unwrap().notes.len(), 1);
+
+        // A range that doesn't extend past the first verse is stored as a single verse.
+        assert_eq!(save_note(&conn, JOHN, 3, 17, Some(17), "x").unwrap().unwrap().verse_end, None);
+
+        // Emptying the text removes the note.
+        assert_eq!(save_note(&conn, JOHN, 3, 16, None, "   ").unwrap(), None);
+        assert_eq!(chapter_marks(&conn, JOHN, 3).unwrap().notes.len(), 1);
+
+        let id = chapter_marks(&conn, JOHN, 3).unwrap().notes[0].id;
+        delete_note(&conn, id).unwrap();
+        assert!(chapter_marks(&conn, JOHN, 3).unwrap().notes.is_empty());
+    }
+
+    #[test]
+    fn bookmarks_toggle() {
+        let tmp = TempDb::new("bookmarks");
+        let conn = open(&tmp.path()).unwrap();
+        assert!(toggle_bookmark(&conn, JOHN, 3, 16).unwrap());
+        assert!(toggle_bookmark(&conn, JOHN, 3, 2).unwrap());
+        assert_eq!(chapter_marks(&conn, JOHN, 3).unwrap().bookmarks, [2, 16]);
+        assert!(!toggle_bookmark(&conn, JOHN, 3, 16).unwrap());
+        assert_eq!(chapter_marks(&conn, JOHN, 3).unwrap().bookmarks, [2]);
+        assert!(chapter_marks(&conn, JOHN, 4).unwrap().bookmarks.is_empty());
+    }
+
+    #[test]
+    fn library_lists_marks_with_text_and_merges_highlight_runs() {
+        let tmp = TempDb::new("library");
+        let conn = open(&tmp.path()).unwrap();
+        set_highlight(&conn, JOHN, 3, &[16, 17, 18], Some("yellow")).unwrap();
+        set_highlight(&conn, JOHN, 3, &[19], Some("blue")).unwrap(); // a different color starts a new run
+        set_highlight(&conn, JOHN, 3, &[21], Some("blue")).unwrap(); // a gap does too
+        set_highlight(&conn, 19, 23, &[1], Some("green")).unwrap();
+        toggle_bookmark(&conn, JOHN, 1, 1).unwrap();
+        save_note(&conn, 1, 1, 1, Some(3), "Creation").unwrap();
+
+        let lib = library(&conn, &|b, c, v, e| format!("{b}:{c}:{v}-{}", e.unwrap_or(v))).unwrap();
+
+        let runs: Vec<_> = lib
+            .highlights
+            .iter()
+            .map(|h| (h.book, h.chapter, h.verse, h.verse_end, h.color.clone().unwrap()))
+            .collect();
+        assert_eq!(
+            runs,
+            [
+                (19, 23, 1, None, "green".into()),
+                (JOHN, 3, 16, Some(18), "yellow".into()),
+                (JOHN, 3, 19, None, "blue".into()),
+                (JOHN, 3, 21, None, "blue".into()),
+            ]
+        );
+        assert_eq!(lib.highlights[1].text, "43:3:16-18");
+        assert_eq!((lib.bookmarks.len(), lib.bookmarks[0].verse), (1, 1));
+        assert_eq!((lib.notes[0].body.as_deref(), lib.notes[0].verse_end, lib.notes[0].text.as_str()), (Some("Creation"), Some(3), "1:1:1-3"));
+    }
+}

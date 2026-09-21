@@ -12,6 +12,8 @@ pub enum Error {
     Io(#[from] std::io::Error),
     #[error("{0}")]
     Path(#[from] tauri::Error),
+    #[error("{0}")]
+    Invalid(String),
 }
 
 // Tauri commands need a serializable error; the message is all the UI needs.
@@ -101,56 +103,6 @@ pub fn open_bible(path: &Path) -> Result<Connection> {
     )?)
 }
 
-/// Opens (creating and migrating if needed) the user DB.
-pub fn open_user(path: &Path) -> Result<Connection> {
-    let conn = Connection::open(path)?;
-    migrate_user(&conn)?;
-    Ok(conn)
-}
-
-// Verse references are translation-independent (book, chapter, verse) so a
-// highlight or note follows the reader across translations.
-const USER_MIGRATIONS: &[&str] = &["
-    CREATE TABLE bookmarks (
-        id INTEGER PRIMARY KEY,
-        book INTEGER NOT NULL,
-        chapter INTEGER NOT NULL,
-        verse INTEGER NOT NULL,
-        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE (book, chapter, verse)
-    );
-    CREATE TABLE highlights (
-        id INTEGER PRIMARY KEY,
-        book INTEGER NOT NULL,
-        chapter INTEGER NOT NULL,
-        verse INTEGER NOT NULL,
-        color TEXT NOT NULL,
-        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE (book, chapter, verse)
-    );
-    CREATE TABLE notes (
-        id INTEGER PRIMARY KEY,
-        book INTEGER NOT NULL,
-        chapter INTEGER NOT NULL,
-        verse INTEGER NOT NULL,
-        body TEXT NOT NULL,
-        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    );
-    CREATE INDEX notes_ref ON notes (book, chapter, verse);
-"];
-
-fn migrate_user(conn: &Connection) -> Result<()> {
-    let version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
-    for (i, sql) in USER_MIGRATIONS.iter().enumerate().skip(version as usize) {
-        let tx = conn.unchecked_transaction()?;
-        tx.execute_batch(sql)?;
-        tx.pragma_update(None, "user_version", i as i64 + 1)?;
-        tx.commit()?;
-    }
-    Ok(())
-}
-
 pub fn list_translations(conn: &Connection) -> Result<Vec<Translation>> {
     let mut stmt = conn.prepare("SELECT id, name FROM translations ORDER BY id")?;
     let rows = stmt.query_map([], |r| Ok(Translation { id: r.get(0)?, name: r.get(1)? }))?;
@@ -171,6 +123,25 @@ pub fn list_books(conn: &Connection) -> Result<Vec<Book>> {
         })
     })?;
     Ok(rows.collect::<rusqlite::Result<_>>()?)
+}
+
+/// The text of one verse, or of `verse..=verse_end`, joined with spaces. Empty if it doesn't exist.
+pub fn verse_text(
+    conn: &Connection,
+    translation: &str,
+    book: u32,
+    chapter: u32,
+    verse: u32,
+    verse_end: Option<u32>,
+) -> Result<String> {
+    let mut stmt = conn.prepare_cached(
+        "SELECT text FROM verses
+         WHERE translation = ?1 AND book = ?2 AND chapter = ?3 AND verse BETWEEN ?4 AND ?5
+         ORDER BY verse",
+    )?;
+    let end = verse_end.unwrap_or(verse).max(verse);
+    let rows = stmt.query_map(params![translation, book, chapter, verse, end], |r| r.get::<_, String>(0))?;
+    Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?.join(" "))
 }
 
 pub fn get_chapter(
@@ -340,6 +311,18 @@ mod tests {
     }
 
     #[test]
+    fn verse_text_returns_one_verse_or_a_joined_range() {
+        let conn = bible();
+        let one = verse_text(&conn, "KJV", 43, 3, 16, None).unwrap();
+        assert!(one.starts_with("For God so loved the world"));
+        let two = verse_text(&conn, "KJV", 43, 3, 16, Some(17)).unwrap();
+        assert!(two.starts_with(&one) && two.contains("For God sent not his Son"));
+        // A reversed range is treated as a single verse, and missing verses give an empty string.
+        assert_eq!(verse_text(&conn, "KJV", 43, 3, 16, Some(3)).unwrap(), one);
+        assert_eq!(verse_text(&conn, "KJV", 43, 3, 99, None).unwrap(), "");
+    }
+
+    #[test]
     fn prose_chapters_carry_paragraph_breaks() {
         let conn = bible();
         let john3 = get_chapter(&conn, "KJV", 43, 3).unwrap();
@@ -485,23 +468,5 @@ mod tests {
             let limit_ms = if cfg!(debug_assertions) { 400 } else { 100 };
             assert!(elapsed.as_millis() < limit_ms, "{q:?} took {elapsed:?} (limit {limit_ms} ms)");
         }
-    }
-
-    #[test]
-    fn user_db_migrates_once() {
-        let dir = std::env::temp_dir().join(format!("bible-app-test-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
-        let path = dir.join("user.db");
-        {
-            let conn = open_user(&path).unwrap();
-            conn.execute("INSERT INTO highlights (book, chapter, verse, color) VALUES (43, 3, 16, 'yellow')", [])
-                .unwrap();
-        }
-        // Re-opening must not re-run migrations or lose data.
-        let conn = open_user(&path).unwrap();
-        let version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0)).unwrap();
-        let n: i64 = conn.query_row("SELECT COUNT(*) FROM highlights", [], |r| r.get(0)).unwrap();
-        assert_eq!((version, n), (1, 1));
-        std::fs::remove_dir_all(&dir).unwrap();
     }
 }

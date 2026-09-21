@@ -1,6 +1,6 @@
 /* Design tokens. Themes only override colors; type, spacing and motion are shared. */
 :root,
-:root[data-theme="paper"] {
+[data-theme="paper"] {
   --bg: #faf6ec;
   --ink: #2a2622;
   --ink-muted: #7a7163;
@@ -10,7 +10,7 @@
   --selection: #eadfb8;
 }
 
-:root[data-theme="sepia"] {
+[data-theme="sepia"] {
   --bg: #f0e4cc;
   --ink: #3b2f22;
   --ink-muted: #76664e;
@@ -20,7 +20,7 @@
   --selection: #e2ce9f;
 }
 
-:root[data-theme="dark"] {
+[data-theme="dark"] {
   --bg: #1c1917;
   --ink: #e8dfcb;
   --ink-muted: #9a9080;
@@ -31,6 +31,14 @@
 }
 
 :root {
+  /* Highlight colors are washes laid over the text, so they work on every theme. */
+  --hl-yellow: #e2b93b;
+  --hl-green: #7fae5f;
+  --hl-blue: #6f9bc8;
+  --hl-pink: #dd7f86;
+  --hl-purple: #9d84c8;
+  --hl-strength: 34%;
+
   --font-scripture: "EB Garamond Variable", "EB Garamond", Georgia, serif;
   --font-ui: "Inter Variable", "Inter", system-ui, sans-serif;
 
@@ -43,6 +51,7 @@
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
+  --hl-strength: 30%;
 }
 
 @media (prefers-reduced-motion: reduce) {

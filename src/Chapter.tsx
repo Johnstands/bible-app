@@ -1,4 +1,4 @@
-import type { Book, Verse } from "./api";
+import type { Book, ChapterMarks, HighlightColor, Verse } from "./api";
 import { chapterTitle } from "./nav";
 import type { Position } from "./nav";
 
@@ -12,6 +12,11 @@ export interface Target {
 export interface Neighbor {
   pos: Position;
   label: string;
+}
+
+export interface Layout {
+  verseByVerse: boolean;
+  pilcrows: boolean;
 }
 
 type Item =
@@ -47,31 +52,67 @@ interface Props {
   book: Book;
   chapter: number;
   verses: Verse[];
+  marks: ChapterMarks;
+  selected: ReadonlySet<number>;
   target: Target | null;
+  layout: Layout;
   prev: Neighbor | null;
   next: Neighbor | null;
   onNavigate: (pos: Position) => void;
+  onVerseClick: (verse: number, e: React.MouseEvent) => void;
+  onOpenNote: (verse: number) => void;
 }
 
-export function Chapter({ book, chapter, verses, target, prev, next, onNavigate }: Props) {
+export function Chapter({
+  book, chapter, verses, marks, selected, target, layout, prev, next,
+  onNavigate, onVerseClick, onOpenNote,
+}: Props) {
   const items = toItems(verses);
+  const firstBlock = items.findIndex((i) => i.type === "block");
   // Psalms open with a title and stanzas, so the chapter number is centered above them
   // instead of dropping into the first line.
   const poetic = verses[0]?.kind === "q";
 
-  const renderVerse = (v: Verse) => {
+  const colors = new Map<number, HighlightColor>(marks.highlights.map((h) => [h.verse, h.color]));
+  const notes = new Set(marks.notes.map((n) => n.verse));
+  const bookmarks = new Set(marks.bookmarks);
+
+  const renderVerse = (v: Verse, pilcrow: boolean) => {
     const hit = target !== null && v.verse >= target.verse && v.verse <= target.end;
+    const classes = ["verse", hit && "is-target", selected.has(v.verse) && "is-selected"].filter(Boolean).join(" ");
     return (
       <span
         key={hit ? `${v.verse}-${target.id}` : v.verse}
-        className={hit ? "verse is-target" : "verse"}
+        className={classes}
         data-verse={v.verse}
+        data-hl={colors.get(v.verse)}
+        onClick={(e) => onVerseClick(v.verse, e)}
+        onMouseDown={(e) => {
+          // Keep modifier-clicks (extend or toggle the verse selection) from also selecting text.
+          if (e.shiftKey || e.ctrlKey || e.metaKey) e.preventDefault();
+        }}
       >
+        {pilcrow && (
+          <span className="pilcrow" aria-hidden="true">
+            ¶
+          </span>
+        )}
         {v.verse !== 1 && (
           <sup className="vn">
             {v.verse}
             {v.verseEnd ? `–${v.verseEnd}` : ""}
           </sup>
+        )}
+        {bookmarks.has(v.verse) && <span className="mk mk-bookmark" role="img" aria-label="Bookmarked" />}
+        {notes.has(v.verse) && (
+          <button
+            className="mk mk-note"
+            aria-label="Open note"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenNote(v.verse);
+            }}
+          />
         )}
         {v.text}{" "}
       </span>
@@ -109,18 +150,34 @@ export function Chapter({ book, chapter, verses, target, prev, next, onNavigate 
           );
         }
         const first = i === 0 || items[i - 1].type !== "block";
-        const numeral = !poetic && i === 0 ? dropNumeral : null;
+        const numeral = !poetic && i === firstBlock ? dropNumeral : null;
         if (item.kind === "q") {
           return (
             <p key={i} className={item.gap ? "line stanza" : "line"}>
-              {item.verses.map(renderVerse)}
+              {item.verses.map((v) => renderVerse(v, false))}
             </p>
           );
+        }
+        // A paragraph opens with a pilcrow, except the chapter's first, which the chapter number marks.
+        const pilcrowAt = (v: Verse) => layout.pilcrows && v.newBlock && i !== firstBlock;
+        if (layout.verseByVerse) {
+          return item.verses.map((v, j) => {
+            const opensChapter = i === firstBlock && j === 0;
+            const classes = ["line", opensChapter && "opens", v.newBlock && !opensChapter && "stanza"]
+              .filter(Boolean)
+              .join(" ");
+            return (
+              <p key={`${i}-${v.verse}`} className={classes}>
+                {opensChapter && numeral}
+                {renderVerse(v, pilcrowAt(v))}
+              </p>
+            );
+          });
         }
         return (
           <p key={i} className={first ? "para first" : "para"}>
             {numeral}
-            {item.verses.map(renderVerse)}
+            {item.verses.map((v) => renderVerse(v, pilcrowAt(v)))}
           </p>
         );
       })}
