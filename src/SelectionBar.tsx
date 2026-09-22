@@ -17,11 +17,13 @@ interface Props {
   onShare: () => void;
   /** Opens the cross-references; null when they don't apply (more than one verse is selected). */
   onRefs: (() => void) | null;
+  /** Projects the selection right away in presentation mode. */
+  onPresent: () => void;
   onClear: () => void;
 }
 
 /** The toolbar that appears over the reading page while verses are selected. */
-export function SelectionBar({ label, color, hasNote, bookmarked, copied, onColor, onNote, onBookmark, onCopy, onShare, onRefs, onClear }: Props) {
+export function SelectionBar({ label, color, hasNote, bookmarked, copied, onColor, onNote, onBookmark, onCopy, onShare, onRefs, onPresent, onClear }: Props) {
   return (
     <div className="selbar" role="toolbar" aria-label={`Actions for ${label}`} onMouseDown={(e) => e.preventDefault()}>
       <span className="selbar-label">{label}</span>
@@ -51,6 +53,9 @@ export function SelectionBar({ label, color, hasNote, bookmarked, copied, onColo
       </button>
       <button className="selbar-action" onClick={onShare} title="Make a picture to share (I)">
         Share
+      </button>
+      <button className="selbar-action" onClick={onPresent} title="Project this on screen (G)">
+        Present
       </button>
       {onRefs && (
         <button className="selbar-action" onClick={onRefs} title="Cross-references (X)">

@@ -33,6 +33,11 @@ const ftsQuery = (q) => {
 export function createBackend({ update = null } = {}) {
   const plans = new Map(); // started reading plans: id -> { plan, startedOn, done: Map(day -> date) }
   const marks = { highlights: new Map(), notes: [], bookmarks: new Set(), nextId: 1 };
+  // Presentation mode: saved services, and where the (nonexistent, in a headless browser) live view is.
+  const services = new Map(); // id -> { id, name, updatedAt, items: [{id, book, chapter, verse, verseEnd, label}] }
+  let servicesNextId = 1;
+  let serviceItemNextId = 1;
+  let presentMode = "closed"; // "closed" | "inline" — there is never a second monitor to open a window on here.
   const key = (b, c, v) => `${b}:${c}:${v}`;
   const parse = (k) => k.split(":").map(Number);
   const verseText = (book, chapter, verse, end) =>
@@ -44,6 +49,12 @@ export function createBackend({ update = null } = {}) {
     "plugin:app|version": () => "0.1.0",
     "plugin:updater|check": () =>
       update ? { rid: 1, currentVersion: "0.1.0", version: update.version, date: null, body: update.notes ?? null, rawJson: {} } : null,
+    // The event plugin: inert here (see the bridge script in harness.mjs) since there is only ever one
+    // page standing in for the main window, and it never needs to actually receive anything back.
+    "plugin:event|listen": () => Math.floor(Math.random() * 1e9),
+    "plugin:event|unlisten": () => {},
+    "plugin:event|emit": () => {},
+    "plugin:event|emit_to": () => {},
     list_translations: () => db.prepare("SELECT id, name FROM translations").all(),
     list_books: () => db.prepare("SELECT id, code, name, abbrev, testament, chapters FROM books ORDER BY id").all(),
     get_chapter: ({ translation, book, chapter }) =>
@@ -166,6 +177,29 @@ export function createBackend({ update = null } = {}) {
         highlights: runs.map(entry),
       };
     },
+    list_services: () => [...services.values()]
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || b.id - a.id)
+      .map((s) => ({ ...s, items: [...s.items] })),
+    create_service: ({ name }) => {
+      const id = servicesNextId++;
+      services.set(id, { id, name: name.trim() || "Untitled service", updatedAt: new Date().toISOString(), items: [] });
+      return id;
+    },
+    rename_service: ({ id, name }) => {
+      const s = services.get(id);
+      if (s) { s.name = name.trim() || "Untitled service"; s.updatedAt = new Date().toISOString(); }
+    },
+    delete_service: ({ id }) => { services.delete(id); },
+    save_service_items: ({ id, items }) => {
+      const s = services.get(id);
+      if (!s) return;
+      s.items = items.map((it) => ({ id: serviceItemNextId++, ...it }));
+      s.updatedAt = new Date().toISOString();
+    },
+    // No real window or monitor exists in a headless browser, so opening always falls back to "inline".
+    present_open: () => ({ mode: (presentMode = "inline") }),
+    present_close: () => ({ mode: (presentMode = "closed") }),
+    present_status: () => ({ mode: presentMode }),
   };
   return commands;
 }

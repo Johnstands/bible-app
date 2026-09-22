@@ -61,6 +61,26 @@ const MIGRATIONS: &[&str] = &[
         PRIMARY KEY (plan, day)
     ) WITHOUT ROWID;
     ",
+    // Saved presentation-mode "services": an ordered list of passages to project during a church service.
+    "
+    CREATE TABLE services (
+        id INTEGER PRIMARY KEY,
+        name TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE service_items (
+        id INTEGER PRIMARY KEY,
+        service INTEGER NOT NULL,
+        position INTEGER NOT NULL,
+        book INTEGER NOT NULL,
+        chapter INTEGER NOT NULL,
+        verse INTEGER NOT NULL,
+        verse_end INTEGER,
+        label TEXT
+    );
+    CREATE INDEX service_items_service ON service_items (service, position);
+    ",
 ];
 
 /// Opens (creating and migrating if needed) the user DB.
@@ -351,6 +371,24 @@ mod tests {
         assert_eq!(chapter_marks(&conn, 19, 23).unwrap().bookmarks, [1]);
         // And the new tables are there and empty.
         assert!(crate::plans::get_plans(&conn).unwrap().is_empty());
+    }
+
+    #[test]
+    fn upgrades_a_version_3_database_and_adds_services() {
+        // What the app created before presentation mode: everything up through reading plans.
+        let tmp = TempDb::new("upgrade-v3");
+        {
+            let conn = Connection::open(tmp.path()).unwrap();
+            for sql in &MIGRATIONS[..3] {
+                conn.execute_batch(sql).unwrap();
+            }
+            conn.pragma_update(None, "user_version", 3).unwrap();
+            conn.execute("INSERT INTO bookmarks (book, chapter, verse) VALUES (43, 3, 16)", []).unwrap();
+        }
+        let conn = open(&tmp.path()).unwrap();
+        assert_eq!(version(&conn), MIGRATIONS.len() as i64);
+        assert_eq!(chapter_marks(&conn, JOHN, 3).unwrap().bookmarks, [16]);
+        assert!(crate::services::list_services(&conn).unwrap().is_empty());
     }
 
     #[test]

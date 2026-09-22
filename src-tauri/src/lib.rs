@@ -3,6 +3,8 @@ mod commands;
 mod crossrefs;
 mod db;
 mod plans;
+mod present;
+mod services;
 mod strongs;
 mod syslibs;
 mod user;
@@ -21,8 +23,11 @@ pub fn run() {
     syslibs::prefer_system_libs();
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        // Reopen at the size, position and maximised state the window was closed with.
-        .plugin(tauri_plugin_window_state::Builder::default().build())
+        // Reopen at the size, position and maximised state the window was closed with. The presentation
+        // window is excluded: its position and fullscreen state are worked out fresh every time from the
+        // connected monitors (see `present.rs`), and letting this plugin restore stale geometry onto it
+        // would fight that placement.
+        .plugin(tauri_plugin_window_state::Builder::default().with_denylist(&[present::LABEL]).build())
         // Checks GitHub Releases for a newer signed build; the app decides when to ask (see src/updater.ts).
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
@@ -58,6 +63,14 @@ pub fn run() {
             commands::delete_note,
             commands::toggle_bookmark,
             commands::get_library,
+            commands::list_services,
+            commands::create_service,
+            commands::rename_service,
+            commands::delete_service,
+            commands::save_service_items,
+            present::present_open,
+            present::present_close,
+            present::present_status,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -181,6 +181,50 @@ export interface Library {
   highlights: LibraryEntry[];
 }
 
+/** One passage in a saved presentation-mode service. */
+export interface ServiceItem {
+  id: number;
+  book: number;
+  chapter: number;
+  verse: number;
+  verseEnd: number | null;
+  /** An optional caption (e.g. "Call to worship") shown instead of the reference alone. */
+  label: string | null;
+}
+
+/** A saved, reusable list of passages a presenter builds ahead of a church service. */
+export interface Service {
+  id: number;
+  name: string;
+  updatedAt: string;
+  items: ServiceItem[];
+}
+
+/** An item to save into a service's list, in the order given. */
+export interface NewServiceItem {
+  book: number;
+  chapter: number;
+  verse: number;
+  verseEnd: number | null;
+  label: string | null;
+}
+
+export const listServices = () => invoke<Service[]>("list_services");
+export const createService = (name: string) => invoke<number>("create_service", { name });
+export const renameService = (id: number, name: string) => invoke<void>("rename_service", { id, name });
+export const deleteService = (id: number) => invoke<void>("delete_service", { id });
+/** Replaces a service's items with `items`, in order. */
+export const saveServiceItems = (id: number, items: NewServiceItem[]) => invoke<void>("save_service_items", { id, items });
+
+/** Where the projected view currently lives. */
+export type PresentStatus = { mode: "window"; monitorLabel: string | null } | { mode: "inline" } | { mode: "closed" };
+
+/** Opens (or re-homes) the live view: on a second monitor if one is connected, else by full-screening
+ *  the main window. Safe to call again at any time — it doubles as "redetect the display". */
+export const presentOpen = () => invoke<PresentStatus>("present_open");
+export const presentClose = () => invoke<PresentStatus>("present_close");
+export const presentStatus = () => invoke<PresentStatus>("present_status");
+
 export const getMarks = (book: number, chapter: number) => invoke<ChapterMarks>("get_marks", { book, chapter });
 /** Highlights the verses with `color`, or clears their highlights when it is null. */
 export const setHighlight = (book: number, chapter: number, verses: number[], color: HighlightColor | null) =>
