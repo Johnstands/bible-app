@@ -2143,11 +2143,52 @@ kbd {
   background: color-mix(in srgb, var(--gold) 14%, transparent);
 }
 
-/* ---- Presentation mode: the control panel ---- */
+/* ---- Presentation mode: the control-center dock ---- */
 
-.presenter {
-  width: min(42rem, 100%);
-  max-height: 82vh;
+/* The reader reflows to make room for the dock instead of running under it. */
+.page--dock-open {
+  padding-right: calc(min(24rem, 100vw) + 1.5rem);
+}
+
+.topbar--dock-open {
+  right: min(24rem, 100vw);
+}
+
+.topbar-button[aria-pressed="true"] {
+  color: var(--accent);
+}
+
+.pres-dock {
+  position: fixed;
+  top: 3.25rem;
+  right: 0;
+  bottom: 0;
+  z-index: 15; /* above page content, below .scrim's 20 so a real modal can still cover it */
+  width: min(24rem, 100vw);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  background: var(--bg);
+  border-left: 1px solid var(--rule);
+  box-shadow: -8px 0 24px color-mix(in srgb, var(--ink) 10%, transparent);
+  font-family: var(--font-ui);
+}
+
+@media (max-width: 900px) {
+  .pres-dock {
+    top: auto;
+    left: 0;
+    right: 0;
+    height: 60vh;
+    border-left: 0;
+    border-top: 1px solid var(--rule);
+  }
+
+  .page--dock-open,
+  .topbar--dock-open {
+    padding-right: 0;
+    right: 0;
+  }
 }
 
 .pres-body {
@@ -2189,8 +2230,7 @@ kbd {
   min-width: 8rem;
 }
 
-.pres-row button,
-.pres-group button {
+.pres-row button {
   padding: 0.4rem 0.85rem;
   font-size: 0.8rem;
   color: var(--ink);
@@ -2201,32 +2241,23 @@ kbd {
     color var(--dur-fast) var(--ease);
 }
 
-.pres-row button:hover,
-.pres-group button:hover {
+.pres-row button:hover {
   background: color-mix(in srgb, var(--gold) 12%, transparent);
 }
 
-.pres-row button:disabled,
-.pres-group button:disabled {
+.pres-row button:disabled {
   opacity: 0.45;
   cursor: default;
 }
 
-.pres-danger {
-  color: var(--accent);
-}
-
-.pres-group {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin: 0.6rem 0;
-}
-
-.pres-group button[aria-pressed="true"] {
+.pres-row button[aria-pressed="true"] {
   color: var(--bg);
   background: var(--accent);
   border-color: var(--accent);
+}
+
+.pres-danger {
+  color: var(--accent);
 }
 
 .pres-live-status {
@@ -2275,21 +2306,12 @@ kbd {
   opacity: 0.35;
 }
 
-.pres-preview {
+.pres-preview-wrap {
   margin: 0.8rem 0;
-  padding: 0.9rem 1.1rem;
-  background: color-mix(in srgb, var(--ink) 5%, var(--bg));
-  border: 1px solid var(--rule);
-  border-radius: 6px;
 }
 
-.pres-preview[data-empty] {
-  font-style: italic;
-  color: var(--ink-muted);
-}
-
-.pres-preview-ref {
-  margin: 0 0 0.3rem;
+.pres-preview-meta {
+  margin: 0 0 0.4rem;
   font-size: 0.72rem;
   font-weight: 500;
   letter-spacing: 0.08em;
@@ -2297,20 +2319,30 @@ kbd {
   color: var(--accent);
 }
 
-.pres-preview-text {
-  margin: 0;
-  font-family: var(--font-scripture);
-  font-size: 1.05rem;
-  line-height: 1.5;
-  color: var(--ink);
+.pres-preview-frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: #000;
 }
 
-/* ---- Presentation mode: the projected view itself (a dedicated window, or an inline overlay) ---- */
+/* ---- Presentation mode: the projected view itself ---- */
+/* Sizes itself from its own container (see PresentationView.tsx), so the same markup works full-bleed
+   in the dedicated window (wrapped in .present-window below) and small, inside .pres-preview-frame. */
 
-.present-view {
+.present-window {
   position: fixed;
   inset: 0;
-  z-index: 19;
+  overflow: hidden;
+}
+
+.present-view {
+  width: 100%;
+  height: 100%;
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2327,13 +2359,11 @@ kbd {
   flex-direction: column;
   align-items: center;
   max-width: 100%;
-  padding: 4vh 6vw;
   text-align: center;
 }
 
 .present-caption {
-  margin: 0 0 1.4vh;
-  font-size: 1.4rem;
+  margin: 0 0 1em;
   font-weight: 500;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -2351,13 +2381,11 @@ kbd {
 }
 
 .present-reference {
-  margin: 2.6vh 0 0;
-  font-size: 1.6rem;
+  margin: 1.6em 0 0;
   font-style: italic;
   letter-spacing: 0.02em;
 }
 
 .present-standby {
-  font-size: 1.4rem;
   font-style: italic;
 }

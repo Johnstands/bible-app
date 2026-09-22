@@ -4,7 +4,6 @@ import { PRESENT_THEMES } from "./presentation";
 import type { PresentationState } from "./presentation";
 
 const LINE_HEIGHT = 1.32;
-const MIN_SIZE = 28;
 const VERSE_FONT = '500 1px "EB Garamond Variable", "EB Garamond", Georgia, serif';
 
 interface Props {
@@ -13,19 +12,24 @@ interface Props {
 
 /**
  * Renders whatever `state` says to show: a blank/black screen, a standby message, or the current
- * slide's text as large as will fit the window. Used both as the whole UI of the dedicated
- * presentation window (see Presentation.tsx) and, on a single-monitor machine, as a full-screen
- * overlay inside the main window (see App.tsx) — so it takes no dependency on which window it's in.
+ * slide's text as large as will fit its container. Sizes itself entirely from the box it's given
+ * (a `ResizeObserver` on its own root, not the window), so the same component works full-bleed as
+ * the whole UI of the dedicated presentation window (see Presentation.tsx) and small, as the control
+ * center's live preview (see PresentationDock.tsx) — the truest possible preview of what's on screen.
  */
 export function PresentationView({ state }: Props) {
+  const wrapRef = useRef<HTMLDivElement | null>(null);
   const [box, setBox] = useState({ width: 0, height: 0 });
   const measureCanvas = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
-    const update = () => setBox({ width: window.innerWidth, height: window.innerHeight });
+    const el = wrapRef.current;
+    if (!el) return;
+    const update = () => setBox({ width: el.clientWidth, height: el.clientHeight });
     update();
-    window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
   }, []);
 
   const theme = PRESENT_THEMES[state.theme];
@@ -34,6 +38,13 @@ export function PresentationView({ state }: Props) {
   const hasCaption = Boolean(state.slide?.label);
   const captionH = hasCaption ? box.height * 0.07 : 0;
   const refH = box.height * 0.08;
+  // Every size below scales with the container (not fixed rem/vh units), so the same component looks
+  // right whether it's the full-screen output or a small dock preview — a fixed pixel size would
+  // either overflow a tiny preview or look tiny on a real screen.
+  const maxSize = Math.round(box.width * 0.055);
+  const minSize = Math.min(maxSize, Math.max(6, Math.round(box.width * 0.018)));
+  const captionSize = Math.max(9, Math.round(box.width * 0.0125));
+  const refSize = Math.max(10, Math.round(box.width * 0.014));
 
   const fit = useMemo(() => {
     if (!state.slide || box.width === 0 || box.height === 0) return null;
@@ -47,20 +58,20 @@ export function PresentationView({ state }: Props) {
       state.slide.text,
       { width: box.width - padX * 2, height: box.height - padY * 2 - captionH - refH },
       measure,
-      { maxSize: Math.round(box.width * 0.055), minSize: MIN_SIZE, lineHeight: LINE_HEIGHT },
+      { maxSize, minSize, lineHeight: LINE_HEIGHT },
     );
-  }, [state.slide, box, padX, padY, captionH, refH]);
+  }, [state.slide, box, padX, padY, captionH, refH, maxSize, minSize]);
 
   return (
-    <div className="present-view" style={{ background: theme.bg, color: theme.ink }} data-blank={state.blank || undefined}>
+    <div ref={wrapRef} className="present-view" style={{ background: theme.bg, color: theme.ink }} data-blank={state.blank || undefined}>
       {!state.blank && state.slide && (
-        <div className="present-slide">
+        <div className="present-slide" style={{ padding: `${padY}px ${padX}px` }}>
           {state.slide.label && (
-            <p className="present-caption" style={{ color: theme.caption }}>
+            <p className="present-caption" style={{ color: theme.caption, fontSize: `${captionSize}px` }}>
               {state.slide.label}
             </p>
           )}
-          <p className="present-text" style={{ fontSize: `${fit?.size ?? MIN_SIZE}px`, lineHeight: LINE_HEIGHT }}>
+          <p className="present-text" style={{ fontSize: `${fit?.size ?? minSize}px`, lineHeight: LINE_HEIGHT }}>
             {fit ? (
               fit.lines.map((line, i) => (
                 <span key={i} className="present-line">
@@ -71,13 +82,13 @@ export function PresentationView({ state }: Props) {
               <span className="present-line">{state.slide.text}</span>
             )}
           </p>
-          <p className="present-reference" style={{ color: theme.caption }}>
+          <p className="present-reference" style={{ color: theme.caption, fontSize: `${refSize}px` }}>
             {state.slide.reference}
           </p>
         </div>
       )}
       {!state.blank && !state.slide && (
-        <p className="present-standby" style={{ color: theme.caption }}>
+        <p className="present-standby" style={{ color: theme.caption, fontSize: `${refSize}px` }}>
           Ready to present
         </p>
       )}

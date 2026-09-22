@@ -4,14 +4,13 @@ import "./App.css";
 import {
   createService, deleteService, EMPTY_MARKS, getChapter, getMarks, getPlans, getWordTags, HIGHLIGHT_COLORS, listBooks,
   listChapters, listServices, presentClose, presentOpen, presentStatus as fetchPresentStatus, renameService, saveNote,
-  saveServiceItems, setHighlight, setPlanDay, startPlan, stopPlan, toggleBookmark,
+  saveServiceItems, setHighlight, setPlanDay, startPlan, stopPlan, toggleBookmark, toNewServiceItem,
 } from "./api";
 import type { Book, ChapterMarks, HighlightColor, NewServiceItem, PresentStatus, Service, StartedPlan, Verse, WordTag } from "./api";
 import { buildQueueSlides, buildSlides, PRESENTATION_WINDOW } from "./presentation";
 import type { Passage, PresentationState, PresentSlide } from "./presentation";
 import { loadPresentationPrefs, savePresentationPrefs } from "./presentationSettings";
-import { Presenter } from "./Presenter";
-import { PresentationView } from "./PresentationView";
+import { PresentationDock } from "./PresentationDock";
 import glossaryText from "../data/glossary.txt?raw";
 import { TRANSLATION, TRANSLATION_NAME } from "./config";
 import { Chapter } from "./Chapter";
@@ -62,7 +61,7 @@ function keepInView(el: Element | null) {
 }
 
 /** The full-screen panels. Only one is open at a time. */
-type Panel = "goto" | "search" | "settings" | "library" | "votd" | "refs" | "share" | "plans" | "present";
+type Panel = "goto" | "search" | "settings" | "library" | "votd" | "refs" | "share" | "plans";
 const DEFAULT_POSITION: Position = { book: 1, chapter: 1 };
 
 interface SavedPosition extends Position {
@@ -134,7 +133,7 @@ function App() {
   const [shareFor, setShareFor] = useState<{ reference: string; text: string } | null>(null);
   const [refsFor, setRefsFor] = useState<(RefSource & { label: string; text: string }) | null>(null);
 
-  // ---- Presentation mode: a saved, orderable "service" of passages, plus presenting anything ad hoc ----
+  // ---- Presentation mode: a saved, orderable "playlist" of passages, plus presenting anything ad hoc ----
   const [services, setServices] = useState<Service[]>([]);
   const [activeServiceId, setActiveServiceId] = useState<number | null>(null);
   const [queueSlides, setQueueSlides] = useState<PresentSlide[]>([]);
@@ -143,7 +142,7 @@ function App() {
   const [adHocIndex, setAdHocIndex] = useState(0);
   const [presentPrefs, setPresentPrefs] = useState(loadPresentationPrefs);
   const [blank, setBlank] = useState(false);
-  const [liveStatus, setLiveStatus] = useState<PresentStatus>({ mode: "closed" });
+  const [liveStatus, setLiveStatus] = useState<PresentStatus>({ open: false, monitorLabel: null });
   const [copied, setCopied] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -377,7 +376,6 @@ function App() {
   const openSettings = () => show("settings");
   const openLibrary = () => show("library");
   const openPlans = () => show("plans");
-  const openPresenter = () => show("present");
   const openSearch = (seed?: string) => {
     if (seed) searchMemory.current = { ...searchMemory.current, query: seed };
     show("search");
@@ -586,32 +584,17 @@ function App() {
   const currentIndex = adHoc ? adHocIndex : queueIndex;
   const currentSlide: PresentSlide | null = currentSlides[currentIndex] ?? null;
   const setCurrentIndex = adHoc ? setAdHocIndex : setQueueIndex;
+  const presenting = liveStatus.open;
 
   const presentState: PresentationState = { blank, theme: presentPrefs.theme, slide: currentSlide };
   const presentStateRef = useRef(presentState);
   presentStateRef.current = presentState;
 
-  // Pushes the current slide to the dedicated window whenever it's the one presenting; the inline,
-  // single-monitor case just renders PresentationView directly below, so it needs no event at all.
+  // Pushes the current slide to the dedicated presentation window whenever it's open. The dock's own
+  // live preview is driven directly by `presentState` as a prop, so it needs no event at all.
   useEffect(() => {
-    if (liveStatus.mode === "window") void emitTo(PRESENTATION_WINDOW, "present:state", presentState);
-  }, [liveStatus.mode, presentState]);
-
-  // The presentation window announces itself once mounted (it may open after presenting already
-  // started, or reload independently), and Rust announces when it's closed from the OS side.
-  useEffect(() => {
-    const unReady = listen("present:ready", () => {
-      void emitTo(PRESENTATION_WINDOW, "present:state", presentStateRef.current);
-    });
-    const unClosed = listen("present://closed", () => {
-      setLiveStatus({ mode: "closed" });
-      resetPresentation();
-    });
-    return () => {
-      void unReady.then((f) => f());
-      void unClosed.then((f) => f());
-    };
-  }, []);
+    if (presenting) void emitTo(PRESENTATION_WINDOW, "present:state", presentState);
+  }, [presenting, presentState]);
 
   /** Clears whatever was on screen, so the next time presenting starts it doesn't pick up a stale
    *  ad-hoc passage (or a blanked screen) left over from before. */
@@ -620,6 +603,23 @@ function App() {
     setAdHocIndex(0);
     setBlank(false);
   };
+
+  // The presentation window announces itself once mounted (it may open after presenting already
+  // started, or reload independently), and Rust announces when it's closed from the OS side.
+  useEffect(() => {
+    const unReady = listen("present:ready", () => {
+      void emitTo(PRESENTATION_WINDOW, "present:state", presentStateRef.current);
+    });
+    const unClosed = listen("present://closed", () => {
+      setLiveStatus({ open: false, monitorLabel: null });
+      resetPresentation();
+    });
+    return () => {
+      void unReady.then((f) => f());
+      void unClosed.then((f) => f());
+    };
+  }, []);
+
   const startPresenting = () => presentOpen().then(setLiveStatus).catch((e) => setNotice(`Couldn’t start presenting: ${e}`));
   const stopPresenting = () =>
     presentClose()
@@ -629,6 +629,7 @@ function App() {
       })
       .catch((e) => setNotice(`Couldn’t stop presenting: ${e}`));
   const redetectDisplay = () => presentOpen().then(setLiveStatus).catch((e) => setNotice(`Couldn’t redetect the display: ${e}`));
+  const togglePresenting = () => (presenting ? void stopPresenting() : void startPresenting());
 
   const goNext = () => setCurrentIndex((i) => Math.min(i + 1, currentSlides.length - 1));
   const goPrev = () => setCurrentIndex((i) => Math.max(i - 1, 0));
@@ -644,14 +645,14 @@ function App() {
     savePresentationPrefs(next);
   };
 
-  /** Presents the reader's current selection right away, without disturbing the service's own position. */
+  /** Presents the reader's current selection right away. Only meaningful once presenting is already
+   *  on — entering presentation mode (which opens a real window) stays behind the topbar toggle. */
   const presentNow = () => {
     if (!loaded || chosen.length === 0) return;
     const verses = loaded.verses.filter((v) => selected.has(v.verse)).map((v) => ({ verse: v.verse, text: v.text }));
     const passage: Passage = { book: loaded.book, chapter: loaded.chapter, title, verses };
     setAdHoc(buildSlides(passage, presentPrefs.granularity));
     setAdHocIndex(0);
-    if (liveStatus.mode === "closed") void startPresenting();
   };
   const returnToService = () => setAdHoc(null);
 
@@ -659,6 +660,11 @@ function App() {
   const pendingItem: NewServiceItem | null =
     loaded && chosen.length > 0
       ? { book: loaded.book, chapter: loaded.chapter, ...span(chosen), label: null }
+      : null;
+  /** Adds the reader's current selection to the active service; null when there's nothing to add to. */
+  const addPendingToService =
+    activeService && pendingItem
+      ? () => saveItems(activeService.id, [...activeService.items.map(toNewServiceItem), pendingItem])
       : null;
 
   // ---- Keyboard: a verse cursor, and stepping through the glossary words ----
@@ -748,17 +754,6 @@ function App() {
   const onKeyRef = useRef<(e: KeyboardEvent) => void>(() => {});
   useEffect(() => {
     onKeyRef.current = (e) => {
-      // While presenting inline (no second monitor), this window IS the projected screen and the
-      // reader underneath is hidden behind it: only the presenting controls make sense here. Escape
-      // opens the Presentation panel on top (to stop presenting, manage the service, and so on) rather
-      // than stopping outright, since the topbar itself is covered and so isn't reachable by mouse.
-      if (liveStatus.mode === "inline" && !overlayOpen) {
-        if (e.key === "Escape") openPresenter();
-        else if (e.key === "ArrowRight" || e.key === " ") goNext();
-        else if (e.key === "ArrowLeft") goPrev();
-        else if (e.key === "b" || e.key === "B") toggleBlank();
-        return;
-      }
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         openGoto();
@@ -821,12 +816,13 @@ function App() {
         e.preventDefault();
         toggleAtCursor();
       } else if (e.key === "w" || e.key === "W") stepWord(e.shiftKey ? -1 : 1);
-      else if (chosen.length > 0) {
+      else if (chosen.length > 0 && presenting) {
+        if (e.key === "g") presentNow();
+      } else if (chosen.length > 0) {
         if (e.key === "b") bookmarkSelection();
         else if (e.key === "n") openNote();
         else if (e.key === "i") openShare();
         else if (e.key === "c") copySelection();
-        else if (e.key === "g") presentNow();
         else if (/^[1-5]$/.test(e.key)) applyColor(HIGHLIGHT_COLORS[+e.key - 1]);
       }
     };
@@ -841,7 +837,7 @@ function App() {
     <>
       {/* While a dialog is open the page behind it can't be focused or read: the dialog is all there is. */}
       <div className="app-shell" inert={overlayOpen}>
-        <header className={`topbar${idle && !overlayOpen ? " is-idle" : ""}`}>
+        <header className={`topbar${idle && !overlayOpen ? " is-idle" : ""}${presenting ? " topbar--dock-open" : ""}`}>
           <button className="location" onClick={openGoto} title={`Go to… (${shortcutLabel("K")} or /)`}>
             {book ? label(pos) : ""}
           </button>
@@ -849,7 +845,12 @@ function App() {
             <button className="topbar-button" onClick={openPlans} title="Reading plans (P)">
               Plans
             </button>
-            <button className="topbar-button" onClick={openPresenter} title="Presentation mode: project verses for a church service">
+            <button
+              className="topbar-button"
+              aria-pressed={presenting}
+              onClick={() => void togglePresenting()}
+              title={presenting ? "Stop presenting" : "Presentation mode: project verses for a church service"}
+            >
               Present
             </button>
             <button className="topbar-button" onClick={openLibrary} title={`Library: bookmarks, notes and highlights (${shortcutLabel("L")})`}>
@@ -868,7 +869,7 @@ function App() {
         </header>
 
         <main
-          className="page"
+          className={`page${presenting ? " page--dock-open" : ""}`}
           onClick={(e) => {
             // Clicking the margin or between verses puts the selection away.
             if (!(e.target as HTMLElement).closest(".verse, button")) clearSelection();
@@ -944,13 +945,45 @@ function App() {
             onCopy={copySelection}
             onShare={openShare}
             onRefs={chosen.length === 1 ? openRefs : null}
-            onPresent={presentNow}
+            presenting={presenting}
+            onPresentNow={presentNow}
+            onAddToService={addPendingToService}
             onClear={clearSelection}
           />
         </div>
       )}
 
-      {liveStatus.mode === "inline" && <PresentationView state={presentState} />}
+      {presenting && (
+        <div inert={overlayOpen}>
+          <PresentationDock
+            services={services}
+            activeServiceId={activeServiceId}
+            onSelectService={setActiveServiceId}
+            onCreateService={createNewService}
+            onRenameService={renameActiveService}
+            onDeleteService={deleteActiveService}
+            onSaveItems={saveItems}
+            titleOf={bookTitle}
+            presentState={presentState}
+            slide={currentSlide}
+            slideIndex={currentIndex}
+            slideCount={currentSlides.length}
+            usingAdHoc={usingAdHoc}
+            onReturnToService={returnToService}
+            onNext={goNext}
+            onPrev={goPrev}
+            blank={blank}
+            onToggleBlank={toggleBlank}
+            granularity={presentPrefs.granularity}
+            onGranularity={setGranularity}
+            theme={presentPrefs.theme}
+            onTheme={setPresentTheme}
+            status={liveStatus}
+            onStop={stopPresenting}
+            onRedetect={redetectDisplay}
+          />
+        </div>
+      )}
 
       {help && !overlayOpen && (
         <div role="region" aria-label="Word meaning">
@@ -1044,38 +1077,6 @@ function App() {
       )}
       {panel === "votd" && books.length > 0 && (
         <VerseOfTheDay books={books} date={today} onGo={navigate} onClose={closePanel} />
-      )}
-      {panel === "present" && (
-        <Presenter
-          services={services}
-          activeServiceId={activeServiceId}
-          onSelectService={setActiveServiceId}
-          onCreateService={createNewService}
-          onRenameService={renameActiveService}
-          onDeleteService={deleteActiveService}
-          onSaveItems={saveItems}
-          titleOf={bookTitle}
-          pendingItem={pendingItem}
-          pendingItemLabel={pendingItem ? referenceLabel(title, loaded?.chapter ?? 0, chosen) : null}
-          slide={currentSlide}
-          slideIndex={currentIndex}
-          slideCount={currentSlides.length}
-          usingAdHoc={usingAdHoc}
-          onReturnToService={returnToService}
-          onNext={goNext}
-          onPrev={goPrev}
-          blank={blank}
-          onToggleBlank={toggleBlank}
-          granularity={presentPrefs.granularity}
-          onGranularity={setGranularity}
-          theme={presentPrefs.theme}
-          onTheme={setPresentTheme}
-          status={liveStatus}
-          onStart={startPresenting}
-          onStop={stopPresenting}
-          onRedetect={redetectDisplay}
-          onClose={closePanel}
-        />
       )}
       {note && (
         <NoteEditor

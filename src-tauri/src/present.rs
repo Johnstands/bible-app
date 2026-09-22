@@ -1,7 +1,8 @@
-//! Presentation-mode window lifecycle: placing the projected view on a second monitor when one is
-//! connected, or full-screening the main window itself when there is only one display. Holds no
-//! slide state — the control window pushes that directly to the presentation window by event
-//! (see `src/presentation.ts` on the frontend); this module only ever answers "where does the
+//! Presentation-mode window lifecycle: a dedicated "presentation" window always exists while
+//! presenting, fullscreen on a second monitor when one is connected, or left as an ordinary window
+//! for the operator to place when there is only one display. The main window is never taken over.
+//! Holds no slide state — the control window pushes that directly to the presentation window by
+//! event (see `src/presentation.ts` on the frontend); this module only ever answers "where does the
 //! live view live right now".
 
 use serde::Serialize;
@@ -34,95 +35,94 @@ pub fn choose_external(monitors: &[MonitorInfo], primary: Option<&MonitorInfo>) 
     monitors.iter().find(|m| Some(*m) != primary).copied()
 }
 
+/// Where the dedicated presentation window is right now.
 #[derive(Debug, Clone, PartialEq, Serialize)]
-#[serde(tag = "mode", rename_all = "camelCase")]
-pub enum PresentStatus {
-    /// A dedicated window is fullscreen on another monitor.
-    #[serde(rename_all = "camelCase")]
-    Window { monitor_label: Option<String> },
-    /// The main window itself is fullscreen (only one display was found).
-    Inline,
-    /// Nothing is being presented.
-    Closed,
+#[serde(rename_all = "camelCase")]
+pub struct PresentStatus {
+    /// Whether the presentation window currently exists.
+    pub open: bool,
+    /// Set once it's actually fullscreen on an external monitor; `None` while it's an ordinary
+    /// window the operator hasn't placed yet, or there's only one display.
+    pub monitor_label: Option<String>,
 }
+
+const CLOSED: PresentStatus = PresentStatus { open: false, monitor_label: None };
 
 fn status_of(app: &AppHandle) -> PresentStatus {
-    if let Some(w) = app.get_webview_window(LABEL) {
-        let monitor_label = w.current_monitor().ok().flatten().and_then(|m| m.name().cloned());
-        PresentStatus::Window { monitor_label }
-    } else if app.get_webview_window(MAIN).map(|w| w.is_fullscreen().unwrap_or(false)).unwrap_or(false) {
-        PresentStatus::Inline
-    } else {
-        PresentStatus::Closed
-    }
+    let Some(w) = app.get_webview_window(LABEL) else { return CLOSED };
+    let monitor_label = w
+        .is_fullscreen()
+        .unwrap_or(false)
+        .then(|| w.current_monitor().ok().flatten().and_then(|m| m.name().cloned()))
+        .flatten();
+    PresentStatus { open: true, monitor_label }
 }
 
-/// Builds (or re-homes) the dedicated presentation window on `mon`, replacing an inline presentation
-/// on `main` if there was one.
-fn open_on_monitor(app: &AppHandle, mon: MonitorInfo) {
-    if let Some(main) = app.get_webview_window(MAIN) {
-        let _ = main.set_fullscreen(false);
-    }
-    let (x, y) = mon.position;
-    let (w, h) = mon.size;
-    if let Some(win) = app.get_webview_window(LABEL) {
-        // Already open: just move it to the (possibly changed) monitor and re-fullscreen there.
-        let _ = win.set_fullscreen(false);
-        let _ = win.set_position(tauri::PhysicalPosition::new(x, y));
-        let _ = win.set_fullscreen(true);
-        let _ = win.show();
-        return;
+/// Default size for the presentation window when there's no second monitor to fullscreen it on,
+/// so the operator has an ordinary window to place (or fullscreen themselves) rather than nothing.
+const DEFAULT_SIZE: (f64, f64) = (960.0, 540.0);
+
+fn ensure_window(app: &AppHandle) -> Option<tauri::WebviewWindow> {
+    if let Some(w) = app.get_webview_window(LABEL) {
+        let _ = w.show();
+        return Some(w);
     }
     let built = WebviewWindowBuilder::new(app, LABEL, WebviewUrl::App("index.html".into()))
         .title("Presentation")
-        .decorations(false)
-        .skip_taskbar(true)
-        .position(x as f64, y as f64)
-        .inner_size(w as f64, h as f64)
+        .inner_size(DEFAULT_SIZE.0, DEFAULT_SIZE.1)
         .build();
-    let Ok(win) = built else { return };
-    let _ = win.set_fullscreen(true);
+    let win = built.ok()?;
     let closed_app = app.clone();
     win.on_window_event(move |e| {
         if let WindowEvent::CloseRequested { .. } = e {
             let _ = closed_app.emit_to(MAIN, "present://closed", ());
         }
     });
+    Some(win)
 }
 
-/// Opens or re-homes the live view: on an external monitor if one is connected, otherwise by
-/// full-screening the main window. Idempotent, so it doubles as "redetect the display" when called
-/// again (e.g. after a monitor is plugged in or removed mid-service). Every monitor/geometry call
-/// degrades gracefully rather than panicking — an unplugged display must never crash the app.
+/// Positions and fullscreens the presentation window on `mon`.
+fn place_fullscreen(win: &tauri::WebviewWindow, mon: MonitorInfo) {
+    let (x, y) = mon.position;
+    let (w, h) = mon.size;
+    let _ = win.set_fullscreen(false); // un-fullscreen first so re-homing across monitors works
+    let _ = win.set_decorations(false);
+    let _ = win.set_position(tauri::PhysicalPosition::new(x, y));
+    let _ = win.set_size(tauri::PhysicalSize::new(w, h));
+    let _ = win.set_fullscreen(true);
+}
+
+/// Releases the presentation window back to an ordinary, operator-placeable window.
+fn release_to_windowed(win: &tauri::WebviewWindow) {
+    let _ = win.set_fullscreen(false);
+    let _ = win.set_decorations(true);
+}
+
+/// Opens (creating if needed) the presentation window: fullscreen on an external monitor if one is
+/// connected, or left as an ordinary window otherwise — the main window is never taken over.
+/// Idempotent, so it doubles as "redetect the display" when called again (e.g. after a monitor is
+/// plugged in or removed mid-service). Every monitor/geometry call degrades gracefully rather than
+/// panicking — an unplugged display must never crash the app.
 #[tauri::command]
 pub fn present_open(app: AppHandle) -> PresentStatus {
+    let Some(win) = ensure_window(&app) else { return CLOSED };
     let monitors: Vec<MonitorInfo> = app.available_monitors().ok().unwrap_or_default().iter().map(MonitorInfo::from).collect();
     let primary = app.primary_monitor().ok().flatten().map(|m| MonitorInfo::from(&m));
 
     match choose_external(&monitors, primary.as_ref()) {
-        Some(mon) => open_on_monitor(&app, mon),
-        None => {
-            if let Some(w) = app.get_webview_window(LABEL) {
-                let _ = w.close();
-            }
-            if let Some(main) = app.get_webview_window(MAIN) {
-                let _ = main.set_fullscreen(true);
-            }
-        }
+        Some(mon) => place_fullscreen(&win, mon),
+        None => release_to_windowed(&win),
     }
     status_of(&app)
 }
 
-/// Stops presenting: closes the dedicated window if there is one, and un-fullscreens the main window.
+/// Stops presenting: closes the presentation window if there is one.
 #[tauri::command]
 pub fn present_close(app: AppHandle) -> PresentStatus {
     if let Some(w) = app.get_webview_window(LABEL) {
         let _ = w.close();
     }
-    if let Some(main) = app.get_webview_window(MAIN) {
-        let _ = main.set_fullscreen(false);
-    }
-    PresentStatus::Closed
+    CLOSED
 }
 
 /// Where the live view currently lives, without changing anything — used to resync the control UI.

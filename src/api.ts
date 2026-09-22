@@ -209,6 +209,15 @@ export interface NewServiceItem {
   label: string | null;
 }
 
+/** Drops the id, keeping the rest, for re-saving a service's own items back (e.g. after reordering). */
+export const toNewServiceItem = (i: ServiceItem): NewServiceItem => ({
+  book: i.book,
+  chapter: i.chapter,
+  verse: i.verse,
+  verseEnd: i.verseEnd,
+  label: i.label,
+});
+
 export const listServices = () => invoke<Service[]>("list_services");
 export const createService = (name: string) => invoke<number>("create_service", { name });
 export const renameService = (id: number, name: string) => invoke<void>("rename_service", { id, name });
@@ -216,11 +225,16 @@ export const deleteService = (id: number) => invoke<void>("delete_service", { id
 /** Replaces a service's items with `items`, in order. */
 export const saveServiceItems = (id: number, items: NewServiceItem[]) => invoke<void>("save_service_items", { id, items });
 
-/** Where the projected view currently lives. */
-export type PresentStatus = { mode: "window"; monitorLabel: string | null } | { mode: "inline" } | { mode: "closed" };
+/** Where the dedicated presentation window is right now. */
+export interface PresentStatus {
+  open: boolean;
+  /** Set once it's actually fullscreen on an external monitor; null otherwise. */
+  monitorLabel: string | null;
+}
 
-/** Opens (or re-homes) the live view: on a second monitor if one is connected, else by full-screening
- *  the main window. Safe to call again at any time — it doubles as "redetect the display". */
+/** Opens (creating if needed) the presentation window: fullscreen on a second monitor if one is
+ *  connected, or an ordinary window otherwise. Safe to call again at any time — it doubles as
+ *  "redetect the display". */
 export const presentOpen = () => invoke<PresentStatus>("present_open");
 export const presentClose = () => invoke<PresentStatus>("present_close");
 export const presentStatus = () => invoke<PresentStatus>("present_status");

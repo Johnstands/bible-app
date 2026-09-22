@@ -29,5 +29,9 @@ export function Presentation() {
     };
   }, []);
 
-  return <PresentationView state={state} />;
+  return (
+    <div className="present-window">
+      <PresentationView state={state} />
+    </div>
+  );
 }

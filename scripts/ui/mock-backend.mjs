@@ -37,7 +37,7 @@ export function createBackend({ update = null } = {}) {
   const services = new Map(); // id -> { id, name, updatedAt, items: [{id, book, chapter, verse, verseEnd, label}] }
   let servicesNextId = 1;
   let serviceItemNextId = 1;
-  let presentMode = "closed"; // "closed" | "inline" — there is never a second monitor to open a window on here.
+  let presentIsOpen = false; // there is never a second monitor in headless Chromium, so it's never fullscreen anywhere.
   const key = (b, c, v) => `${b}:${c}:${v}`;
   const parse = (k) => k.split(":").map(Number);
   const verseText = (book, chapter, verse, end) =>
@@ -196,10 +196,11 @@ export function createBackend({ update = null } = {}) {
       s.items = items.map((it) => ({ id: serviceItemNextId++, ...it }));
       s.updatedAt = new Date().toISOString();
     },
-    // No real window or monitor exists in a headless browser, so opening always falls back to "inline".
-    present_open: () => ({ mode: (presentMode = "inline") }),
-    present_close: () => ({ mode: (presentMode = "closed") }),
-    present_status: () => ({ mode: presentMode }),
+    // No real second window exists in a headless browser; the dock's own live preview (driven by
+    // React state, not this bridge) is what actually gets exercised by the UI tests for this feature.
+    present_open: () => ({ open: (presentIsOpen = true), monitorLabel: null }),
+    present_close: () => ({ open: (presentIsOpen = false), monitorLabel: null }),
+    present_status: () => ({ open: presentIsOpen, monitorLabel: null }),
   };
   return commands;
 }

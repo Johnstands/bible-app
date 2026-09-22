@@ -75,15 +75,13 @@ export function buildQueueSlides(passages: Passage[], granularity: Granularity):
   return passages.flatMap((p) => buildSlides(p, granularity));
 }
 
-export const PRESENT_THEMES_LIST = ["dark", "light", "high-contrast"] as const;
+export const PRESENT_THEMES_LIST = ["dark", "light"] as const;
 export type PresentTheme = (typeof PRESENT_THEMES_LIST)[number];
 
-/** Colors for the projected view, independent of the reader's own theme (a projector wants its own
- *  high-contrast look regardless of what the reader is set to). */
+/** Colors for the projected view, independent of the reader's own theme. */
 export const PRESENT_THEMES: Record<PresentTheme, { label: string; bg: string; ink: string; caption: string }> = {
   dark: { label: "Dark", bg: "#0b0b0c", ink: "#f4efe4", caption: "#b0a696" },
   light: { label: "Light", bg: "#faf6ec", ink: "#241f19", caption: "#7a7060" },
-  "high-contrast": { label: "High contrast", bg: "#000000", ink: "#ffffff", caption: "#cfcfcf" },
 };
 
 /** Everything needed to draw the projected screen; pushed whole from the control window. */
