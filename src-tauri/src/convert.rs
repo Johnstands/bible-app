@@ -446,7 +446,9 @@ mod tests {
 
     #[test]
     fn looks_for_libreoffice_where_each_platform_installs_it() {
-        let linux = libreoffice_candidates("linux", Some(OsStr::new("/home/me/bin:/usr/local/bin")), &[], None);
+        // Joined with this platform's own separator, as `PATH` is wherever the app runs.
+        let path_var = std::env::join_paths(["/home/me/bin", "/usr/local/bin"]).unwrap();
+        let linux = libreoffice_candidates("linux", Some(&path_var), &[], None);
         assert_eq!(linux[0], Path::new("/home/me/bin/soffice"));
         assert!(linux.contains(&PathBuf::from("/usr/local/bin/libreoffice")));
         assert!(linux.contains(&PathBuf::from("/usr/lib/libreoffice/program/soffice")));

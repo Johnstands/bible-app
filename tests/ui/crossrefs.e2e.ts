@@ -101,8 +101,9 @@ describe("cross-references", () => {
     await app.page.click('[data-verse="17"]');
     await app.page.keyboard.press("x");
     await panel(app).waitFor();
-    await app.page.waitForSelector(".xrefs .goto-empty");
-    expect(await app.page.locator(".xrefs .goto-empty").textContent()).toBe("No cross-references for this verse.");
+    // "Looking…" shows in the same spot first, so wait for the answer itself (on a slow machine the
+    // lookup is still running when the panel appears).
+    await app.page.getByText("No cross-references for this verse.").waitFor();
     expect(await rows(app).count()).toBe(0);
   });
 
