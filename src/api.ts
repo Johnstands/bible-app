@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 
 export interface Translation {
   id: string;
@@ -182,7 +182,8 @@ export interface Library {
 }
 
 /** One passage in a saved presentation-mode playlist. */
-export interface PlaylistItem {
+export interface PassageItem {
+  kind: "passage";
   id: number;
   book: number;
   chapter: number;
@@ -192,7 +193,20 @@ export interface PlaylistItem {
   label: string | null;
 }
 
-/** A saved, reusable list of passages a presenter builds ahead of a church service. */
+/** A deck of slide images in a playlist (see src-tauri/src/decks.rs). */
+export interface DeckItem {
+  kind: "deck";
+  id: number;
+  deck: number;
+  /** The file it was imported from, e.g. "Welcome.png" or "Welcome.png + 11 more". */
+  name: string;
+  slideCount: number;
+  label: string | null;
+}
+
+export type PlaylistItem = PassageItem | DeckItem;
+
+/** A saved, reusable list of passages and slides a presenter builds ahead of a church service. */
 export interface Playlist {
   id: number;
   name: string;
@@ -201,22 +215,16 @@ export interface Playlist {
 }
 
 /** An item to save into a playlist, in the order given. */
-export interface NewPlaylistItem {
-  book: number;
-  chapter: number;
-  verse: number;
-  verseEnd: number | null;
-  label: string | null;
-}
+export type NewPlaylistItem =
+  | { kind: "passage"; book: number; chapter: number; verse: number; verseEnd: number | null; label: string | null }
+  | { kind: "deck"; deck: number; label: string | null };
 
-/** Drops the id, keeping the rest, for re-saving a playlist's own items back (e.g. after reordering). */
-export const toNewPlaylistItem = (i: PlaylistItem): NewPlaylistItem => ({
-  book: i.book,
-  chapter: i.chapter,
-  verse: i.verse,
-  verseEnd: i.verseEnd,
-  label: i.label,
-});
+/** Drops the id (and a deck's display fields), keeping the rest, for re-saving a playlist's own
+ *  items back (e.g. after reordering). */
+export const toNewPlaylistItem = (i: PlaylistItem): NewPlaylistItem =>
+  i.kind === "deck"
+    ? { kind: "deck", deck: i.deck, label: i.label }
+    : { kind: "passage", book: i.book, chapter: i.chapter, verse: i.verse, verseEnd: i.verseEnd, label: i.label };
 
 export const listPlaylists = () => invoke<Playlist[]>("list_playlists");
 export const createPlaylist = (name: string) => invoke<number>("create_playlist", { name });
@@ -224,6 +232,27 @@ export const renamePlaylist = (id: number, name: string) => invoke<void>("rename
 export const deletePlaylist = (id: number) => invoke<void>("delete_playlist", { id });
 /** Replaces a playlist's items with `items`, in order. */
 export const savePlaylistItems = (id: number, items: NewPlaylistItem[]) => invoke<void>("save_playlist_items", { id, items });
+/** Adds image files (in the order given) to the end of a playlist as one deck of slides. */
+export const importSlides = (playlist: number, paths: string[]) => invoke<void>("import_slides", { playlist, paths });
+
+/** A PDF's bytes, for drawing its pages as slides (see slideImport.ts). */
+export const readSlidePdf = (path: string) => invoke<ArrayBuffer>("read_slide_pdf", { path });
+/** Adds a PDF's drawn pages to the end of a playlist as one deck. `body` is `encodeFrames([name, ...pngs])`
+ *  (see slideImport.ts), sent as raw bytes rather than JSON. */
+export const importRenderedSlides = (playlist: number, body: Uint8Array) =>
+  invoke<void>("import_rendered_slides", body, { headers: { "x-playlist": String(playlist) } });
+
+/** The program presentation files (.pptx and the like) get converted with, e.g. "LibreOffice", or null if none is installed. */
+export const officeConverter = () => invoke<string | null>("office_converter");
+/** Converts a presentation file to a PDF with that program; takes seconds. */
+export const convertSlidesToPdf = (path: string) => invoke<ArrayBuffer>("convert_slides_to_pdf", { path });
+
+/** Image types a deck can be made from; must match `IMAGE_TYPES` in src-tauri/src/decks.rs. */
+export const SLIDE_IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "webp", "gif"];
+/** The URI scheme slide images are served from; must match `decks::SCHEME` in the Rust backend. */
+const SLIDES_SCHEME = "slides";
+/** Where a deck's slide `index` (0-based) can be loaded from, in either window. */
+export const slideSrc = (deck: number, index: number) => convertFileSrc(`${deck}/${index + 1}`, SLIDES_SCHEME);
 
 /** Where the dedicated presentation window is right now. */
 export interface PresentStatus {

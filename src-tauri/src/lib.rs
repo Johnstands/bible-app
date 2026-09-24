@@ -1,7 +1,9 @@
 mod cards;
 mod commands;
+mod convert;
 mod crossrefs;
 mod db;
+mod decks;
 mod plans;
 mod present;
 mod playlists;
@@ -31,6 +33,13 @@ pub fn run() {
         // Checks GitHub Releases for a newer signed build; the app decides when to ask (see src/updater.ts).
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        // The file picker for adding slides to a playlist.
+        .plugin(tauri_plugin_dialog::init())
+        // Slide images for presentation-mode playlists, loadable by both windows (see decks.rs).
+        .register_uri_scheme_protocol(decks::SCHEME, |ctx, request| {
+            let root = ctx.app_handle().path().app_data_dir().ok().map(|d| d.join(decks::DIR));
+            decks::serve(root, request.uri().path())
+        })
         .setup(|app| {
             let bible_path = app
                 .path()
@@ -68,6 +77,11 @@ pub fn run() {
             commands::rename_playlist,
             commands::delete_playlist,
             commands::save_playlist_items,
+            commands::import_slides,
+            commands::read_slide_pdf,
+            commands::import_rendered_slides,
+            commands::office_converter,
+            commands::convert_slides_to_pdf,
             present::present_open,
             present::present_close,
             present::present_status,

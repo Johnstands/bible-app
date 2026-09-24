@@ -27,7 +27,8 @@ export const GRANULARITIES = ["verse", "whole"] as const;
 export type Granularity = (typeof GRANULARITIES)[number];
 export const GRANULARITY_LABELS: Record<Granularity, string> = { verse: "One verse at a time", whole: "Whole passage" };
 
-export interface PresentSlide {
+export interface VerseSlide {
+  kind: "verse";
   book: number;
   chapter: number;
   verse: number;
@@ -38,12 +39,54 @@ export interface PresentSlide {
   label?: string;
 }
 
+/** One slide of an imported deck: a picture shown as-is, letterboxed on black. */
+export interface ImageSlide {
+  kind: "image";
+  src: string;
+  deckName: string;
+  /** 0-based position within its deck. */
+  index: number;
+  count: number;
+}
+
+export type PresentSlide = VerseSlide | ImageSlide;
+
+/** A deck of slide images as queued in a playlist: its name and where each slide loads from. */
+export interface QueuedDeck {
+  name: string;
+  srcs: string[];
+}
+
+/** One playlist item, ready to turn into slides; null for one with none (e.g. a passage whose
+ *  chapter failed to load), which still keeps its place so item positions line up. */
+export type QueueEntry = Passage | QueuedDeck | null;
+
+/** Where one playlist item's slides sit in the flowing queue. */
+export interface ItemSpan {
+  start: number;
+  count: number;
+}
+
+export interface Queue {
+  slides: PresentSlide[];
+  /** One per queue entry, in order: jumping to an item is `slides[items[i].start]`. */
+  items: ItemSpan[];
+}
+
+const isDeck = (e: Passage | QueuedDeck): e is QueuedDeck => "srcs" in e;
+
+/** A short caption for any slide: "John 3:16", or "Welcome.png · 3 of 12". */
+export function slideCaption(slide: PresentSlide): string {
+  return slide.kind === "image" ? `${slide.deckName} · ${slide.index + 1} of ${slide.count}` : slide.reference;
+}
+
 /** Builds a passage's slides: one slide per verse, or the whole passage joined into a single slide. */
-export function buildSlides(passage: Passage, granularity: Granularity): PresentSlide[] {
+export function buildSlides(passage: Passage, granularity: Granularity): VerseSlide[] {
   const { book, chapter, title, label, verses } = passage;
   if (verses.length === 0) return [];
   if (granularity === "verse") {
     return verses.map((v) => ({
+      kind: "verse" as const,
       book,
       chapter,
       verse: v.verse,
@@ -56,6 +99,7 @@ export function buildSlides(passage: Passage, granularity: Granularity): Present
   const nums = verses.map((v) => v.verse);
   return [
     {
+      kind: "verse",
       book,
       chapter,
       verse: nums[0],
@@ -68,11 +112,27 @@ export function buildSlides(passage: Passage, granularity: Granularity): Present
 }
 
 /**
- * One flowing list of slides for a whole queued playlist: each passage's slides in order, so stepping
- * past the end of one continues straight into the next — even across a chapter or book boundary.
+ * One flowing list of slides for a whole queued playlist: each item's slides in order (a passage's
+ * verses, a deck's pictures), so stepping past the end of one continues straight into the next —
+ * even across a chapter or book boundary, or from a passage into a deck.
  */
-export function buildQueueSlides(passages: Passage[], granularity: Granularity): PresentSlide[] {
-  return passages.flatMap((p) => buildSlides(p, granularity));
+export function buildQueue(entries: QueueEntry[], granularity: Granularity): Queue {
+  const slides: PresentSlide[] = [];
+  const items = entries.map((entry) => {
+    const start = slides.length;
+    if (entry && isDeck(entry)) {
+      entry.srcs.forEach((src, index) => slides.push({ kind: "image", src, deckName: entry.name, index, count: entry.srcs.length }));
+    } else if (entry) {
+      slides.push(...buildSlides(entry, granularity));
+    }
+    return { start, count: slides.length - start };
+  });
+  return { slides, items };
+}
+
+/** Which item (index into `items`) the slide at `slideIndex` belongs to, or -1. */
+export function itemAt(items: ItemSpan[], slideIndex: number): number {
+  return items.findIndex((it) => slideIndex >= it.start && slideIndex < it.start + it.count);
 }
 
 export const PRESENT_THEMES_LIST = ["dark", "light"] as const;

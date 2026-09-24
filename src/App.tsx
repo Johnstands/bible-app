@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { emitTo, listen } from "@tauri-apps/api/event";
+import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
 import "./App.css";
 import {
-  createPlaylist, deletePlaylist, EMPTY_MARKS, getChapter, getMarks, getPlans, getWordTags, HIGHLIGHT_COLORS, listBooks,
-  listChapters, listPlaylists, presentClose, presentOpen, presentStatus as fetchPresentStatus, renamePlaylist, saveNote,
-  savePlaylistItems, setHighlight, setPlanDay, startPlan, stopPlan, toggleBookmark, toNewPlaylistItem,
+  createPlaylist, deletePlaylist, EMPTY_MARKS, getChapter, getMarks, getPlans, getWordTags, HIGHLIGHT_COLORS, importSlides,
+  listBooks, listChapters, listPlaylists, presentClose, presentOpen, presentStatus as fetchPresentStatus, renamePlaylist, saveNote,
+  convertSlidesToPdf, importRenderedSlides, officeConverter, readSlidePdf, savePlaylistItems, setHighlight, setPlanDay, SLIDE_IMAGE_EXTENSIONS, slideSrc,
+  startPlan, stopPlan, toggleBookmark, toNewPlaylistItem,
 } from "./api";
+import { baseName, encodeFrames, isOffice, isPdf, OFFICE_EXTENSIONS, renderPdfPages } from "./slideImport";
 import type { Book, ChapterMarks, HighlightColor, NewPlaylistItem, PresentStatus, Playlist, StartedPlan, Verse, WordTag } from "./api";
-import { buildQueueSlides, buildSlides, PRESENTATION_WINDOW } from "./presentation";
-import type { Passage, PresentationState, PresentSlide } from "./presentation";
+import { buildQueue, buildSlides, itemAt, PRESENTATION_WINDOW, slideCaption } from "./presentation";
+import type { Passage, PresentationState, PresentSlide, Queue, QueueEntry } from "./presentation";
 import { loadPresentationPrefs, savePresentationPrefs } from "./presentationSettings";
 import { PresentationDock } from "./PresentationDock";
 import glossaryText from "../data/glossary.txt?raw";
@@ -133,15 +136,21 @@ function App() {
   const [shareFor, setShareFor] = useState<{ reference: string; text: string } | null>(null);
   const [refsFor, setRefsFor] = useState<(RefSource & { label: string; text: string }) | null>(null);
 
-  // ---- Presentation mode: a saved, orderable "playlist" of passages, plus presenting anything ad hoc ----
+  // ---- Presentation mode: a saved, orderable "playlist" of passages and slides, plus presenting anything ad hoc ----
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [activePlaylistId, setActivePlaylistId] = useState<number | null>(null);
-  const [queueSlides, setQueueSlides] = useState<PresentSlide[]>([]);
+  const [queue, setQueue] = useState<Queue>({ slides: [], items: [] });
+  const queueSlides = queue.slides;
   const [queueIndex, setQueueIndex] = useState(0);
   const [adHoc, setAdHoc] = useState<PresentSlide[] | null>(null);
   const [adHocIndex, setAdHocIndex] = useState(0);
   const [presentPrefs, setPresentPrefs] = useState(loadPresentationPrefs);
   const [blank, setBlank] = useState(false);
+  /** What an import of slides is doing right now ("Drawing Sunday.pdf: page 3 of 12…"), or null. */
+  const [importStatus, setImportStatus] = useState<string | null>(null);
+  /** The installed program presentation files get converted with ("LibreOffice"), null if none,
+   *  undefined until asked. Asked each time presenting starts, so installing one takes effect. */
+  const [converter, setConverter] = useState<string | null | undefined>(undefined);
   const [liveStatus, setLiveStatus] = useState<PresentStatus>({ open: false, monitorLabel: null });
   const [copied, setCopied] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -540,16 +549,20 @@ function App() {
 
   const activePlaylist = playlists.find((s) => s.id === activePlaylistId) ?? null;
 
-  // Rebuilt whenever the active playlist's passages or the slide granularity change; fetches each
-  // distinct chapter the playlist touches once, however many items come from it.
+  // Rebuilt whenever the active playlist's items or the slide granularity change; fetches each
+  // distinct chapter the playlist's passages touch once, however many items come from it. Decks need
+  // no fetching: their slides are image files the view loads itself.
   useEffect(() => {
     if (!activePlaylist || activePlaylist.items.length === 0) {
-      setQueueSlides([]);
+      setQueue({ slides: [], items: [] });
       setQueueIndex(0);
       return;
     }
     let stale = false;
-    const chapters = [...new Set(activePlaylist.items.map((i) => `${i.book}:${i.chapter}`))];
+    const chapterKey = (book: number, chapter: number) => `${book}:${chapter}`;
+    const chapters = [
+      ...new Set(activePlaylist.items.flatMap((i) => (i.kind === "passage" ? [chapterKey(i.book, i.chapter)] : []))),
+    ];
     Promise.all(
       chapters.map((key) => {
         const [b, c] = key.split(":").map(Number);
@@ -559,14 +572,17 @@ function App() {
       .then((entries) => {
         if (stale) return;
         const byChapter = new Map(entries);
-        const passages: Passage[] = activePlaylist.items.flatMap((item) => {
-          const verses = byChapter.get(`${item.book}:${item.chapter}`) ?? [];
+        const queued: QueueEntry[] = activePlaylist.items.map((item) => {
+          if (item.kind === "deck") {
+            return { name: item.name, srcs: Array.from({ length: item.slideCount }, (_, i) => slideSrc(item.deck, i)) };
+          }
+          const verses = byChapter.get(chapterKey(item.book, item.chapter)) ?? [];
           const end = item.verseEnd ?? item.verse;
           const included = verses.filter((v) => v.verse >= item.verse && v.verse <= end).map((v) => ({ verse: v.verse, text: v.text }));
-          if (included.length === 0) return [];
-          return [{ book: item.book, chapter: item.chapter, title: bookTitle(item.book), label: item.label ?? undefined, verses: included }];
+          if (included.length === 0) return null;
+          return { book: item.book, chapter: item.chapter, title: bookTitle(item.book), label: item.label ?? undefined, verses: included };
         });
-        setQueueSlides(buildQueueSlides(passages, presentPrefs.granularity));
+        setQueue(buildQueue(queued, presentPrefs.granularity));
       })
       .catch((e) => setNotice(`Couldn’t load the playlist: ${e}`));
     return () => {
@@ -655,11 +671,81 @@ function App() {
     setAdHocIndex(0);
   };
   const returnToPlaylist = () => setAdHoc(null);
+  /** What "return" goes back to, e.g. "Welcome.png · 7 of 12"; null with nothing to return to. */
+  const returnLabel = queueSlides[queueIndex] ? slideCaption(queueSlides[queueIndex]) : null;
+
+  /** Puts slide `index` of the playlist on screen at once, leaving any ad-hoc passage. */
+  const jumpToSlide = (index: number) => {
+    if (index < 0 || index >= queueSlides.length) return;
+    setAdHoc(null);
+    setQueueIndex(index);
+  };
+  /** Puts a playlist item's first slide on screen. */
+  const jumpToItem = (i: number) => {
+    const item = queue.items[i];
+    if (item && item.count > 0) jumpToSlide(item.start);
+  };
+  /** The playlist item on screen right now, or -1 (nothing, or an ad-hoc passage). */
+  const liveItem = adHoc ? -1 : itemAt(queue.items, queueIndex);
+
+  useEffect(() => {
+    if (liveStatus.open) officeConverter().then(setConverter).catch(() => setConverter(null));
+  }, [liveStatus.open]);
+
+  /**
+   * Asks for pictures, PDFs and presentation files and adds them to the end of the active playlist:
+   * the pictures together as one deck, then each PDF or presentation as its own deck, its pages
+   * drawn here with pdf.js (a presentation is converted to a PDF first).
+   */
+  const addSlides = async () => {
+    if (!activePlaylist || importStatus !== null) return;
+    const playlist = activePlaylist.id;
+    const picked = await openFileDialog({
+      multiple: true,
+      title: "Add slides",
+      filters: [{ name: "Slides", extensions: [...OFFICE_EXTENSIONS, "pdf", ...SLIDE_IMAGE_EXTENSIONS] }],
+    }).catch((e) => {
+      setNotice(`Couldn’t open the file picker: ${e}`);
+      return null;
+    });
+    if (!picked || picked.length === 0) return;
+    // Slides go in filename order ("Slide1.png", "Slide2.png", … "Slide10.png"), whatever order the picker returned.
+    const byName = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+    const sorted = [...picked].sort((a, b) => byName.compare(baseName(a), baseName(b)));
+    const pictures = sorted.filter((p) => !isPdf(p) && !isOffice(p));
+    const documents = sorted.filter((p) => isPdf(p) || isOffice(p));
+    setImportStatus("Adding slides…");
+    try {
+      if (pictures.length > 0) await importSlides(playlist, pictures);
+      for (const path of documents) {
+        const name = baseName(path);
+        let pdf: ArrayBuffer;
+        if (isOffice(path)) {
+          setImportStatus(`Converting ${name}${converter ? ` with ${converter}` : ""}…`);
+          pdf = await convertSlidesToPdf(path);
+        } else {
+          setImportStatus(`Opening ${name}…`);
+          pdf = await readSlidePdf(path);
+        }
+        const pages = await renderPdfPages(pdf, name, (done, total) =>
+          setImportStatus(`Drawing ${name}: page ${done} of ${total}…`),
+        );
+        setImportStatus(`Saving ${name}…`);
+        await importRenderedSlides(playlist, encodeFrames([new TextEncoder().encode(name), ...pages]));
+      }
+    } catch (e) {
+      setNotice(`Couldn’t add those slides: ${e instanceof Error ? e.message : e}`);
+    } finally {
+      setImportStatus(null);
+      // Whatever got added before a failure is kept, so show it.
+      await refreshPlaylists();
+    }
+  };
 
   /** The reader's current selection, ready to add to a playlist, or null when nothing is selected. */
   const pendingItem: NewPlaylistItem | null =
     loaded && chosen.length > 0
-      ? { book: loaded.book, chapter: loaded.chapter, ...span(chosen), label: null }
+      ? { kind: "passage", book: loaded.book, chapter: loaded.chapter, ...span(chosen), label: null }
       : null;
   /** Adds the reader's current selection to the active playlist; null when there's nothing to add to. */
   const addPendingToPlaylist =
@@ -932,7 +1018,7 @@ function App() {
       </div>
 
       {ready && chosen.length > 0 && !overlayOpen && (
-        <div role="region" aria-label="Verse actions">
+        <div role="region" aria-label="Verse actions" className={presenting ? "selbar-dock-open" : undefined}>
           <SelectionBar
             label={referenceLabel(title, loaded.chapter, chosen)}
             color={sharedColor}
@@ -969,7 +1055,16 @@ function App() {
             slideIndex={currentIndex}
             slideCount={currentSlides.length}
             usingAdHoc={usingAdHoc}
+            returnLabel={returnLabel}
             onReturnToPlaylist={returnToPlaylist}
+            itemSpans={queue.items}
+            liveItem={liveItem}
+            liveSlide={adHoc ? -1 : queueIndex}
+            onJumpToItem={jumpToItem}
+            onJumpToSlide={jumpToSlide}
+            importStatus={importStatus}
+            converter={converter}
+            onAddSlides={() => void addSlides()}
             onNext={goNext}
             onPrev={goPrev}
             blank={blank}

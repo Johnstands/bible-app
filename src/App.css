@@ -2158,6 +2158,12 @@ kbd {
   color: var(--accent);
 }
 
+/* The selection bar centers over the reader, not the whole window, so none of it sits under the dock. */
+.selbar-dock-open .selbar {
+  left: calc((100vw - min(24rem, 100vw)) / 2);
+  max-width: calc(100vw - min(24rem, 100vw) - 2rem);
+}
+
 .pres-dock {
   position: fixed;
   top: 3.25rem;
@@ -2179,6 +2185,7 @@ kbd {
     top: auto;
     left: 0;
     right: 0;
+    width: auto;
     height: 60vh;
     border-left: 0;
     border-top: 1px solid var(--rule);
@@ -2188,6 +2195,23 @@ kbd {
   .topbar--dock-open {
     padding-right: 0;
     right: 0;
+  }
+
+  /* So the chapter's last verses can still scroll up above the sheet to be selected. */
+  .page--dock-open {
+    padding-bottom: 60vh;
+  }
+
+  /* A full-width 16:9 preview would fill the whole sheet. */
+  .pres-preview-frame {
+    max-width: 28rem;
+  }
+
+  /* The dock is a bottom sheet here: the selection bar rides above it instead. */
+  .selbar-dock-open .selbar {
+    left: 50%;
+    bottom: calc(60vh + 1rem);
+    max-width: calc(100vw - 2rem);
   }
 }
 
@@ -2273,18 +2297,117 @@ kbd {
 }
 
 .pres-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.8rem;
-  padding: 0.55rem 0;
+  padding: 0.35rem 0;
   border-bottom: 1px solid var(--rule);
   font-size: 0.88rem;
 }
 
+.pres-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+/* The whole item is the "show this now" target. */
+.pres-item-go {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.25rem 0.4rem;
+  border: 0;
+  border-left: 3px solid transparent;
+  border-radius: 3px;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pres-item-go:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+}
+
+.pres-item-go:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.pres-item-go[aria-current] {
+  border-left-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.pres-thumb {
+  flex: none;
+  width: 3.2rem;
+  aspect-ratio: 16 / 9;
+  object-fit: contain;
+  background: #000;
+  border-radius: 2px;
+}
+
 .pres-item-ref {
+  overflow: hidden;
   font-family: var(--font-scripture);
   color: var(--ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pres-item-count {
+  flex: none;
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+}
+
+/* Muted gray is too faint on the live row's tint. */
+.pres-item-go[aria-current] .pres-item-count {
+  color: var(--ink);
+}
+
+.pres-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(4.5rem, 1fr));
+  gap: 0.4rem;
+  margin: 0.4rem 0 0.2rem;
+  padding: 0;
+  list-style: none;
+}
+
+.pres-strip-slide {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 3px;
+  background: #000;
+  cursor: pointer;
+}
+
+.pres-strip-slide img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: contain;
+}
+
+.pres-strip-slide:hover {
+  border-color: var(--rule);
+}
+
+.pres-strip-slide[aria-current] {
+  border-color: var(--accent);
+}
+
+.pres-hint {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--ink-muted);
 }
 
 .pres-item-actions {
@@ -2384,6 +2507,13 @@ kbd {
   margin: 1.6em 0 0;
   font-style: italic;
   letter-spacing: 0.02em;
+}
+
+.present-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
 }
 
 .present-standby {

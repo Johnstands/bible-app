@@ -1,0 +1,390 @@
+# Slides in playlists — plan
+
+Adding slide decks (PowerPoint, Keynote, PDF, plain images) to a presentation-mode playlist, so a
+service can go *welcome slide → Psalm 100 → song lyrics → John 3:16 → announcements* and
+Next/Previous steps straight through all of it.
+
+Status: **all 4 steps built** on branch `slides-import`, not merged. Step 4 (PowerPoint on
+Windows, Keynote on macOS) **still needs testing on real Windows and Mac machines**; see the
+checklist under "Step 4".
+See "Progress" at the end.
+
+## What the user sees
+
+1. In the dock's Playlist section, a new **Add slides…** button next to the existing passage flow.
+2. A file picker accepting `.pptx`, `.ppt`, `.key`, `.odp`, `.pdf`, `.png`, `.jpg`/`.jpeg`.
+3. A progress line in the dock: *"Converting with PowerPoint…"* (or Keynote / LibreOffice / "Reading
+   PDF…"). A few seconds per deck.
+4. The deck appears as **one playlist item**, e.g. `▣ Sunday.pptx · 12 slides`, with a small
+   thumbnail. Like a passage, it can be moved up/down or removed, and it expands into its individual
+   slides when presenting. A passage expands into verses the same way.
+5. While presenting, the dock's live preview and the projection window show the slide image,
+   letterboxed on black to fit the screen. The Dark/Light and verse/whole toggles don't affect
+   image slides.
+6. **Switching freely between verses and slides while live**, not just stepping in order:
+   - **Click any playlist item** in the dock to put it on screen at once: a passage goes to its
+     first verse, a deck to its first slide. Today the dock's item list isn't clickable, and the
+     only way to move is Next/Previous.
+   - **Deck items expand** into a strip of slide thumbnails. Click any thumbnail to jump straight to
+     that slide (e.g. back to the chorus slide).
+   - **The item on screen is highlighted** in the list, so it's always clear where Next goes.
+   - **An unplanned verse mid-slides:** select verses in the reader → **Present now**. The app
+     already remembers the playlist position while showing an ad-hoc passage (`adHoc` state is
+     separate from `queueIndex`), so **Return to the playlist** lands back on the exact slide that
+     was up. The button's wording follows what it returns to: "Back to Sunday.pptx, slide 7".
+   - Implementation: `buildQueueSlides` also returns, per playlist item, the index of its first
+     slide (`itemStarts: number[]`), so "jump to item *i*" is `setQueueIndex(itemStarts[i])` and
+     "which item is live" is a lookup the other way. Clicking an item while an ad-hoc passage is up
+     leaves ad-hoc mode, like Return does.
+7. If the source file changed, a **Re-import** action on the item re-runs the conversion from the
+   original path (if it still exists). Otherwise the user picks the file again.
+
+What does **not** carry over: animations, transitions, embedded video/audio, speaker notes. Each
+slide is a still image of its final, fully-built state. The dock says so the first time.
+
+## How a .pptx gets turned into images
+
+The app never draws PowerPoint slides itself (in this plan; see "Later" for that option). It asks
+a presentation program already on the computer to export them, trying in this order:
+
+| Order | Platform | Converter | Mechanism |
+|---|---|---|---|
+| 1 | Windows | Microsoft PowerPoint | A PowerShell script drives PowerPoint through COM automation: `Presentations.Open(path, ReadOnly, Untitled, WithWindow=false)`, then `Slide.Export(out, "PNG", 1920, h)` per slide, then close. |
+| 1 | macOS | Keynote (free on every Mac), else PowerPoint for Mac | `osascript`. Keynote: `export … as slide images with properties {image format: PNG}`. PowerPoint: `save … as save as PNG`. |
+| 2 | any | LibreOffice | `soffice --headless --convert-to pdf --outdir <tmp> <file>`, then the PDF path below. |
+| — | any | *(none found)* | Import refused with a clear message: "Export it as a PDF from PowerPoint/Google Slides/Keynote and add that instead." |
+
+**PDFs** (and LibreOffice's output) are rasterized **in the app's own webview with pdf.js**
+(`pdfjs-dist`), page by page onto a canvas at 1920px wide, then the PNG bytes are sent to Rust to
+store. No external program is needed, so PDF import works on every computer.
+
+**Images** are copied as-is (one image = a one-slide deck).
+
+Detecting what's installed is a small pure function, `choose_converter(platform, found) ->
+Option<Converter>`, unit-tested like `present::choose_external`. The probing (checking known install
+paths / the registry `App Paths` key on Windows, `/Applications/*.app` on macOS, `PATH` for
+`soffice`) wraps it.
+
+### Safety and robustness
+- **The file path is never spliced into script text.** PowerShell gets it through an environment
+  variable, and AppleScript through `on run argv`, so a filename with quotes or `$(...)` can't run
+  anything.
+- **Timeout** (~2 min) on every external program, and the process is killed on expiry. PowerPoint can
+  hang on a repair prompt or a password-protected file.
+- PowerPoint/Keynote are only opened read-only and closed afterwards. If PowerPoint was **already
+  running** with the user's own files, we open our file as a separate presentation and close only
+  that one, never `Quit` the app.
+- Conversion runs off the UI thread (a Tauri async command). The dock stays usable, and a second
+  import is refused while one is running.
+- macOS: add `NSAppleEventsUsageDescription` to the bundle's Info.plist (Tauri: `bundle.macOS`
+  `infoPlist`). Without it, macOS silently blocks controlling Keynote/PowerPoint. The first import
+  shows the system "allow Bible App to control Keynote?" prompt.
+
+## Storage
+
+Slide images live under the app data dir, next to `user.db`:
+
+```
+~/.local/share/com.jxyeverfight.bibleapp/decks/<deck id>/0001.png, 0002.png, …
+```
+
+(and the Windows/macOS equivalents). Copies, not links, so moving or deleting the original file
+doesn't break a playlist.
+
+**Serving the images to the webviews:** a custom URI scheme registered in Rust
+(`register_asynchronous_uri_scheme_protocol("slides", …)`), resolving
+`slides://localhost/<deck>/<n>` → that file. It only serves files inside `decks/`, and rejects `..`
+and anything not matching the `<number>/<number>` shape. Preferred over enabling Tauri's general
+asset protocol, which would need a broader filesystem scope. Both windows (main + presentation)
+can load these URLs, so the projection window needs no new event payloads. It gets a small
+`{kind: "image", src}` slide like any other state push.
+
+## Database: migration 5 (not an edit to migration 4)
+
+Migration 4 is unreleased but **already pushed to origin/main**, and supporting deck items means
+rebuilding `playlist_items` anyway (SQLite can't drop `NOT NULL` from a column in place). So this
+adds a **new** migration rather than editing migration 4 again. Nobody's database needs a hand fix,
+including the developer's own.
+
+```sql
+CREATE TABLE decks (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL,            -- original filename, e.g. "Sunday.pptx"
+    source_path TEXT,              -- for Re-import; may no longer exist
+    slide_count INTEGER NOT NULL,
+    converter TEXT NOT NULL,       -- "powerpoint" | "keynote" | "libreoffice" | "pdf" | "image"
+    imported_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Rebuild playlist_items so an item is either a passage or a deck.
+CREATE TABLE playlist_items_new (
+    id INTEGER PRIMARY KEY,
+    playlist INTEGER NOT NULL,
+    position INTEGER NOT NULL,
+    book INTEGER, chapter INTEGER, verse INTEGER, verse_end INTEGER,   -- passage items
+    deck INTEGER REFERENCES decks(id),                                 -- deck items
+    label TEXT,
+    CHECK ((deck IS NULL) = (book IS NOT NULL AND chapter IS NOT NULL AND verse IS NOT NULL))
+);
+INSERT INTO playlist_items_new (id, playlist, position, book, chapter, verse, verse_end, label)
+    SELECT id, playlist, position, book, chapter, verse, verse_end, label FROM playlist_items;
+DROP TABLE playlist_items;
+ALTER TABLE playlist_items_new RENAME TO playlist_items;
+CREATE INDEX playlist_items_playlist ON playlist_items (playlist, position);
+```
+
+**Deck lifetime:** a deck is kept while any playlist item references it. After a playlist's items
+are saved or a playlist is deleted, unreferenced decks are deleted, rows *and* their `decks/<id>/`
+folder, in the same Rust call. One deck can be reused in several playlists.
+
+## Code changes
+
+**Rust (`src-tauri/`)**
+- `user.rs`: migration 5; an upgrade test (v4 DB with passages → v5, passages intact, decks empty).
+- `playlists.rs`: `PlaylistItem`/`NewItem` become tagged enums
+  (`#[serde(tag = "kind")]` → `{kind: "passage", …}` / `{kind: "deck", deck, name, slideCount}`);
+  `list_playlists` joins `decks`; `save_playlist_items`/`delete_playlist` garbage-collect decks.
+- New `decks.rs`: `choose_converter` (pure, unit-tested), install probing, the three converter
+  runners, `store_images(deck_id, pngs)`, `delete_deck_files`.
+- New commands: `import_slides(path) -> ImportResult` (office formats and images;
+  returns either a finished deck or `{needsPdfRender: tmpPdfPath}` for the pdf.js step),
+  `store_rendered_pages(deckDraft, pages: Vec<bytes>) -> Deck`, `converter_available() -> Option<String>`
+  (so the dock can say "PowerPoint found" up front).
+- `lib.rs`: register the commands and the `slides://` protocol; add `tauri-plugin-dialog`.
+- `capabilities/default.json`: `dialog:allow-open`. (The presentation window needs nothing new.)
+- `tauri.conf.json`: macOS `infoPlist` with `NSAppleEventsUsageDescription`.
+
+**Frontend (`src/`)**
+- `api.ts`: `PlaylistItem`/`NewPlaylistItem` as discriminated unions; `toNewPlaylistItem` handles
+  both; new `importSlides` / `storeRenderedPages` / `converterAvailable` wrappers.
+- `presentation.ts`: `PresentSlide` becomes `VerseSlide | ImageSlide`; `buildQueueSlides` takes a
+  list of *passages or decks* and expands decks into `{kind: "image", src, deckName, index, count}`
+  slides. Unit tests extended.
+- `PresentationView.tsx`: render `ImageSlide` as a centered, `object-fit: contain` image on black.
+  Skip the text-fitting path for it. Blank still wins over everything.
+- `App.tsx`: the queue-building effect handles deck items (no chapter fetch needed); an
+  `addSlides()` flow: pick file → `importSlides` → if a PDF render is needed, rasterize with pdf.js
+  → `storeRenderedPages` → append the deck item to the active playlist. Import progress/errors go
+  through the existing `setNotice`.
+- `PresentationDock.tsx`: **Add slides…** button (disabled with a hint when no playlist is active),
+  deck rows with thumbnail + "12 slides", an importing state, Re-import. The live-status line shows
+  "Slide 3 of 12 · Sunday.pptx" for image slides.
+- New `src/pdfRender.ts`: pdf.js page → canvas → PNG bytes, with unit tests on a tiny fixture PDF.
+- `package.json`: `pdfjs-dist`, `@tauri-apps/plugin-dialog`.
+
+**UI test harness (`scripts/ui/`)**: mock `import_slides`/`store_rendered_pages` and a mock
+`slides://` image (a data URL); new tests for adding a deck, reordering it among passages,
+stepping Next across passage → slides → passage, and removing it.
+
+## Build order (each step shippable/testable on its own)
+
+1. **Data + display, images only.** Migration 5, deck types end to end, `slides://` protocol, image
+   slides in the view/preview, PNG/JPG import, and **click-to-jump** (items, slide thumbnails,
+   live highlight, "Back to … slide N"). Proves the whole pipeline without any converter.
+2. **PDF import** via pdf.js.
+3. **LibreOffice** `.pptx`/`.odp` → PDF → step 2. *Fully testable on this Linux machine
+   (LibreOffice is installed).*
+4. **PowerPoint (Windows) and Keynote/PowerPoint (macOS).** Written here and compiled by CI on
+   those platforms, but **cannot be run here**. Needs manual testing on real machines (checklist
+   below).
+
+## Testing
+
+Automated (all run here): `cargo test` (migration upgrade, deck GC, `choose_converter`, protocol
+path validation), `npm test` (slide building with mixed items, pdf render), `npm run test:ui`
+(dock flows), `tsc --noEmit`. Plus a real LibreOffice conversion of a sample `.pptx` on Linux.
+
+**Manual checklist (needs someone with the machine):**
+- Windows + PowerPoint: import a normal deck; a 4:3 deck (letterboxed); a deck while PowerPoint is
+  already open with another file (that file must stay open); a password-protected deck (clean error,
+  no hang); a filename containing quotes/`$`.
+- Windows without PowerPoint but with LibreOffice: falls back to LibreOffice.
+- Mac: first-import permission prompt appears and, once allowed, Keynote exports; with Keynote
+  removed/denied, PowerPoint for Mac is used if present.
+- Any machine with nothing installed: `.pptx` is refused with the "export as PDF" message; PDF and
+  images still work.
+- Plus the existing second-monitor checklist in `presentation-mode-plan.md`, now with image slides
+  on the projector.
+
+## Later (not in this plan)
+
+- **Built-in .pptx renderer** as a last-resort fallback (read the pptx XML and draw text boxes,
+  pictures, backgrounds, basic shapes). Good enough for typical church decks, but weak on charts,
+  SmartArt, WordArt and missing fonts. Only worth it if "nothing installed" turns out to be common.
+- Choosing a slide *range* from a deck, rather than the whole deck.
+- Google Slides import by link (would need the network; the app is otherwise fully offline).
+
+## Decisions
+
+- **Switching between verses and slides must be free, not only in order** (user, 2026-09-24).
+  Covered by item 6 of "What the user sees". Click-to-jump applies to passages too, so it's built
+  in step 1.
+- A deck is added whole for now (a range can be added later). Image slides are letterboxed on
+  black. These are defaults, not user decisions yet; easy to change.
+
+## Progress
+
+### Step 1 — done (2026-09-24)
+
+Built as planned, except that the importer takes **images only** for now, so the file picker offers
+PNG/JPG/WebP/GIF. Several pictures chosen at once become one deck, ordered by filename with
+numbers compared as numbers ("Slide2" before "Slide10"). The deck is named after the first file
+("Slide2.png + 2 more").
+
+- Rust: migration 5; `decks.rs` (`import_images`, the `slides://` handler `serve`, request-path
+  validation, `delete_files`); `playlists.rs` items are a `kind`-tagged enum; save/delete return
+  now-unused decks, and `commands.rs` deletes their folders; `import_slides` command (async);
+  `tauri-plugin-dialog`, with `dialog:allow-open` in the main window's capability.
+- Frontend: `PresentSlide = VerseSlide | ImageSlide`; `buildQueue` returns `{slides, items}` spans
+  plus `itemAt`; the dock has click-to-jump items, a slide-thumbnail strip (always open for the live
+  deck, toggle for others), the live highlight, "Back to … · 7 of 12", and **Add slides…**.
+- Import and add-to-playlist happen in one DB transaction, so a fresh deck is never momentarily
+  unused and can't be cleaned up in between.
+
+**Existing layout bugs fixed along the way** (both from the first presentation-mode work):
+- While presenting, the selection toolbar was centered on the whole window, so "Add to playlist"
+  and the × ended up under the dock. It now centers over the reader, and on narrow windows sits
+  above the bottom sheet.
+- On narrow windows (≤900px) the bottom-sheet dock was still only 24rem wide. It's now full width,
+  the preview is capped at 28rem, and the reader gets bottom padding so a chapter's last verses can
+  scroll above the sheet.
+- The UI tests' mock server wrote its response headers before running the command, so any command
+  that threw crashed the request instead of returning its error. Fixed.
+
+**Verified:** `cargo test` 83 (10 new: migration 4→5 upgrade, deck import/serve/cleanup, path
+validation, serde shape); `npm test` 128; `npm run test:ui` 118 (new `tests/ui/slides.e2e.ts`, 9
+tests incl. axe); `tsc` clean; the real app launched on this machine and migrated the developer's
+own `user.db` from v4 to v5 with its playlist intact (backup at `user.db.bak-before-migration-5`).
+
+**Not verified yet:** the real `slides://` scheme and the real file picker inside the Tauri window.
+The UI tests use stand-ins for both. Next time the app is open: Present → a playlist → Add slides…
+→ pick a few pictures → check they show in the dock and on the projection window.
+
+### Step 2 — done (2026-09-25)
+
+PDF import, as planned, with these specifics:
+
+- **pdf.js 6.3** (`pdfjs-dist`), **legacy build**, loaded with a dynamic `import()` only when a PDF is
+  imported, so it's a separate ~490 KB chunk plus a 1.3 MB worker, and the main bundle is unchanged.
+  The legacy build is for older WebKit (macOS's system webview can be old). **Don't downgrade
+  below 6.2.108:** 5.6–6.2 have GHSA-hq66-cqwq-w95j (a malicious PDF can run script). 5.x was tried
+  first and `npm audit` flagged it.
+- The flow, in `App.tsx`'s `addSlides`, with the rendering in the new `src/slideImport.ts`:
+  1. `read_slide_pdf(path)` returns the file raw (`tauri::ipc::Response`, not JSON). It only reads
+     `.pdf` files, up to 256 MB, since it's the one command that reads a user-named file.
+  2. pdf.js draws each page fitted into 1920×1080, via `canvas.toBlob` to a PNG.
+  3. `import_rendered_slides` gets one raw body, `encodeFrames([name, ...pngs])` (u32-LE
+     length-prefixed frames), with the playlist in an `x-playlist` header. Rust (`decks::split_frames`,
+     `import_rendered`) checks each page is a PNG and stores the deck through the same
+     all-or-nothing `create_deck` as pictures.
+- One pick can mix things: the pictures together become one deck, then each PDF its own, all in
+  filename order. The dock shows progress ("Drawing Sunday.pdf: page 3 of 12…").
+- Errors are readable: password-protected PDFs, files that aren't really PDFs, more than 500 pages
+  (`MAX_SLIDES`, shared by both import paths). Whatever was added before a failure is kept.
+- **Not bundled:** pdf.js's standard-font data, CMaps and the JPEG 2000 decoder wasm. PDFs exported
+  from PowerPoint, Keynote or Google Slides embed their fonts and images, so they don't need them. A
+  PDF relying on non-embedded standard fonts falls back to system fonts, and one with JPEG 2000
+  images may not show those images. Add them (copy the `pdfjs-dist` folders into the build and pass
+  `standardFontDataUrl`/`cMapUrl`/`wasmUrl`) if that ever turns up.
+
+**Verified:** `cargo test` 88 (5 new: frame splitting, rendered import, non-PNG/empty/bad-name
+refusals, size limit, `read_pdf` only reading PDFs); `npm test` 135 (`slideImport.test.ts`);
+`npm run test:ui` 121 (3 new PDF tests, using a generated 3-page PDF from
+`scripts/ui/test-pdf.mjs`; the harness now carries raw bytes both ways); production build.
+**Also run in real WebKitGTK 2.52** (the Linux app's engine, via its MiniBrowser): the same
+`renderPdfPages` drew all 3 pages at 1920×1080 with the right colors.
+
+**Not verified:** a PDF import inside the actual Tauri window, and anything on macOS/Windows.
+
+### Step 3 — done (2026-09-25)
+
+`.pptx`/`.ppt`/`.pptm`/`.ppsx`/`.pps`/`.odp`/`.key` go through LibreOffice to a PDF, then through
+step 2 exactly as a picked PDF would. New `src-tauri/src/convert.rs`:
+
+- `find_converter`: looks for `soffice` in the usual places per platform (a pure, tested
+  `libreoffice_candidates`: PATH, `/usr/lib/libreoffice`, `/opt`, snap; `/Applications/LibreOffice.app`
+  and `~/Applications`; `Program Files\LibreOffice\program\soffice.exe`).
+- `convert_to_pdf`: copies the file to `input.<ext>` in a temp work dir (removed however it ends),
+  so no user-chosen text reaches the command line. Runs `soffice --headless … --convert-to pdf` with
+  its own profile (`-env:UserInstallation`, kept in the app cache dir so later runs start faster, and
+  so it can't hand the job to a LibreOffice window the user has open). A 3-minute timeout **kills
+  the whole process tree** (`soffice` is only a launcher: killing just it would leave LibreOffice
+  running). That uses a process group on Unix and `taskkill /T` on Windows, and a test proves the
+  child is gone. It also has no console window on Windows, and clears an AppImage's
+  library-path/GTK/Python variables for the child. LibreOffice exits 0 even on failure, so success
+  means "the PDF exists".
+- Commands: `office_converter` (name or null, so the dock's hint says whether .pptx works here) and
+  `convert_slides_to_pdf` (raw PDF bytes; runs on `spawn_blocking`).
+
+**Design change for step 4:** PowerPoint and Keynote will also export a **PDF** (both can),
+rather than PNGs as first planned, so they plug into `convert_to_pdf`'s slot and everything after
+stays shared. `Converter` is the enum to extend.
+
+**Verified:** `cargo test` 96 (8 in `convert`, including fake-`soffice` scripts for success,
+no output, and a hang whose child must be killed; the hang test was checked to fail without the
+tree kill), plus **a real conversion** of `src-tauri/tests/fixtures/hymn.pptx` (3 slides, made by
+LibreOffice from a hand-written .fodp) with the installed LibreOffice 26.8, skipped with a note
+where LibreOffice isn't installed. `npm test` 136, `npm run test:ui` 124 (3 new). LibreOffice's PDF
+of that deck was also drawn in **real WebKitGTK** by `renderPdfPages`: 3 × 1920×1080, with the
+deck's exact background color.
+
+**Not verified:** a .pptx import inside the actual Tauri window; LibreOffice on macOS/Windows;
+running from an AppImage.
+
+### Step 4 — built, untested on its platforms (2026-09-25)
+
+`convert.rs` now has three converters behind one interface, all producing a **PDF** that goes
+through step 2:
+
+| Converter | Where | How | Opens |
+|---|---|---|---|
+| PowerPoint | Windows | `powershell.exe` (from `%SystemRoot%`) runs `POWERPOINT_SCRIPT` through COM: `Presentations.Open(in, ReadOnly, not Untitled, no window)`, `SaveAs(out, 32 = ppSaveAsPDF)`, close, and `Quit` only if no other presentation is open. Detected by `reg query HKCR\PowerPoint.Application\CurVer`. | all but `.key` |
+| Keynote | macOS | `osascript` runs `KEYNOTE_SCRIPT`: open, `export … as PDF`, close without saving, quit only if it wasn't running. Detected by `Keynote.app` in `/Applications` or `~/Applications`. | all but `.odp` |
+| LibreOffice | anywhere | as in step 3 | everything |
+
+- `find_tools()` lists what's installed, best first; `tools_for(ext)` filters by what opens that
+  file; `convert_with_best` tries each in turn and **falls back** to the next if one fails (not
+  for password-protected files).
+- **Paths never enter script text:** PowerShell reads them from `BIBLE_APP_INPUT`/`BIBLE_APP_OUTPUT`,
+  and AppleScript takes them as `argv`. Tests check both commands' exact arguments and environment
+  on Linux.
+- **Password-protected .pptx/.pptm/.ppsx are refused up front**, detected by the OLE header Office
+  wraps encrypted files in, since PowerPoint would otherwise sit at an invisible password prompt.
+- Failure messages now end with the tail of what the converter printed (PowerShell and AppleScript
+  errors explain themselves), for diagnosing on machines we can't see.
+- The scratch folder moved from the system temp dir to the **app cache dir**. That's hopefully
+  friendlier to sandboxed Keynote writing its output (unverified), and it keeps LibreOffice's profile
+  next to it.
+- **`src-tauri/Info.plist`** adds `NSAppleEventsUsageDescription` (Tauri merges this file
+  automatically; checked in tauri-codegen's source). Without it macOS refuses to let the app control
+  Keynote, with no prompt. The macOS build isn't Apple-signed, so no hardened-runtime entitlement is
+  needed. If it's ever signed and notarized, add `com.apple.security.automation.apple-events`.
+- **PowerPoint for Mac is deliberately not used.** It's sandboxed, and saving to a path outside its
+  container triggers "grant access" dialogs that automation can't answer. Keynote is on every Mac
+  and opens .pptx.
+- **CI:** new `other-platforms` job (windows-latest, macos-latest) runs `cargo check --all-targets`
+  and the `convert::`/`decks::`/`playlists::` tests. Until now, Windows/macOS-only code (including
+  step 3's) was first compiled on release day. It runs on pull requests, so it takes effect once
+  this branch has a PR.
+
+**Verified here (Linux):** `cargo test` 102 (tool choice per file type, fallback,
+password refusal, both scripted commands' arguments/environment, converter-output tail in errors,
+plus step 3's tests); `npm test` 136; `npm run test:ui` 124; build.
+
+**Manual checklist (needs the machines):**
+- **Windows + PowerPoint:** Add slides… → a normal .pptx. The dock should say "converted with
+  PowerPoint" and the slides should match PowerPoint. Then:
+  - a 4:3 deck (letterboxed);
+  - a deck while PowerPoint is already open with another file (that file must stay open, and
+    PowerPoint must not quit);
+  - a password-protected .pptx (clean message, no hang);
+  - a filename with spaces, quotes, `$` or accents;
+  - a `.key` file (should go to LibreOffice if installed, else the "needs…" message).
+- **Windows without PowerPoint, with LibreOffice:** it should say "converted with LibreOffice".
+- **Mac:** Add slides… → a .pptx and a .key. The first time, macOS should ask "allow KJV Reader's
+  Bible to control Keynote?"; allow it. Check the slides appear, and Keynote quits afterwards if it
+  wasn't open before. If the export fails with a permissions error, that's the sandbox question
+  above: note the message in the toast. With permission denied (System Settings → Privacy &
+  Security → Automation), it should fall back to LibreOffice if installed, else show the error.
+- **Any machine with nothing installed:** .pptx gives the "needs PowerPoint, Keynote or
+  LibreOffice… or save it as a PDF" message; PDFs and pictures still work.
