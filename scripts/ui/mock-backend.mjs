@@ -42,6 +42,8 @@ export function createBackend({ update = null } = {}) {
   let decksNextId = 1;
   // What the next "Add slides…" file picker returns; a test can change it with mock:set_picker.
   let pickerPaths = ["/home/user/Pictures/Welcome.png", "/home/user/Pictures/Slide10.png", "/home/user/Pictures/Slide2.png"];
+  // The office suite presentation files convert with; a test can take it away with mock:set_converter.
+  let converter = "LibreOffice";
   /** A saved item as list_playlists returns it: deck items carry their deck's name and size. */
   const storedItem = (it) => {
     const item = { id: playlistItemNextId++, ...it };
@@ -232,6 +234,15 @@ export function createBackend({ update = null } = {}) {
       if (!/\.pdf$/i.test(path)) throw new Error(`${path} isn't a PDF.`);
       return { __bytes: (/broken/i.test(path) ? Buffer.from("this is not a pdf") : makePdf(3)).toString("base64") };
     },
+    office_converter: () => converter,
+    // Like the real thing: a presentation becomes a (three-page) PDF, unless it's "broken".
+    convert_slides_to_pdf: ({ path }) => {
+      const name = path.split("/").pop();
+      if (!converter) throw new Error("Adding PowerPoint or Keynote files needs LibreOffice (free, from libreoffice.org). Or save the file as a PDF and add that.");
+      if (/broken/i.test(path)) throw new Error(`LibreOffice couldn't convert ${name}. It may be damaged or password-protected; try saving it as a PDF and adding that.`);
+      return { __bytes: makePdf(3).toString("base64") };
+    },
+    "mock:set_converter": ({ name }) => { converter = name; },
     import_rendered_slides: (_args, { raw, headers }) => {
       const s = playlists.get(Number(headers["x-playlist"]));
       if (!s) throw new Error("That playlist no longer exists.");

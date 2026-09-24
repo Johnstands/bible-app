@@ -33,6 +33,8 @@ interface Props {
   onJumpToSlide: (queueIndex: number) => void;
   /** What an import in progress is doing, or null when none is. */
   importStatus: string | null;
+  /** The program PowerPoint files are converted with, null if none is installed, undefined until known. */
+  converter: string | null | undefined;
   onAddSlides: () => void;
   onNext: () => void;
   onPrev: () => void;
@@ -59,7 +61,7 @@ export function PresentationDock({
   playlists, activePlaylistId, onSelectPlaylist, onCreatePlaylist, onRenamePlaylist, onDeletePlaylist, onSaveItems,
   titleOf,
   presentState, slide, slideIndex, slideCount, usingAdHoc, returnLabel, onReturnToPlaylist,
-  itemSpans, liveItem, liveSlide, onJumpToItem, onJumpToSlide, importStatus, onAddSlides, onNext, onPrev,
+  itemSpans, liveItem, liveSlide, onJumpToItem, onJumpToSlide, importStatus, converter, onAddSlides, onNext, onPrev,
   blank, onToggleBlank, granularity, onGranularity, theme, onTheme,
   status, onStop, onRedetect,
 }: Props) {
@@ -291,8 +293,10 @@ export function PresentationDock({
                 </span>
               </div>
               <p className="pres-hint">
-                A PDF, or pictures (PNG or JPG). Pictures chosen together become one set, in filename order. For PowerPoint or
-                Keynote, save the deck as a PDF first. Animations and videos don’t carry over.
+                {converter
+                  ? `PowerPoint, Keynote or OpenDocument files (converted with ${converter}), PDFs, or pictures.`
+                  : "PDFs or pictures. For PowerPoint or Keynote, save the deck as a PDF first, or install LibreOffice to add them directly."}{" "}
+                Pictures chosen together become one set, in filename order. Animations and videos don’t carry over.
               </p>
             </>
           )}

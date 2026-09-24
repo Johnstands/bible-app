@@ -126,12 +126,12 @@ describe("slides in a playlist", () => {
     expect(await itemRefs(app)).toEqual(["John 3:16–17"]);
   });
 
-  it("says why a file that isn't a picture can't be added", async () => {
+  it("says why a file that isn't slides can't be added", async () => {
     await withPassageAndDeck();
-    await pick(app, ["/home/user/Sunday.pptx"]);
+    await pick(app, ["/home/user/notes.txt"]);
     await app.page.getByRole("button", { name: "Add slides…" }).click();
     await app.page.waitForSelector(".toast");
-    expect(await app.page.locator(".toast").textContent()).toMatch(/Couldn’t add those slides: .*Sunday\.pptx isn't a supported image/);
+    expect(await app.page.locator(".toast").textContent()).toMatch(/Couldn’t add those slides: .*notes\.txt isn't a supported image/);
     expect(await items(app).count()).toBe(2);
   });
 
@@ -173,6 +173,48 @@ describe("slides in a playlist", () => {
     expect(await app.page.locator(".toast").textContent()).toMatch(/^Couldn’t add those slides: broken\.pdf couldn’t be opened as a PDF/);
     expect(await items(app).count()).toBe(2);
     expect(await app.page.getByRole("button", { name: "Add slides…" }).isEnabled()).toBe(true);
+  });
+
+  it("converts a PowerPoint file with LibreOffice and draws its slides", async () => {
+    await withPassageAndDeck();
+    const hint = dock(app).locator(".pres-hint");
+    expect(await hint.textContent()).toMatch(/^PowerPoint, Keynote or OpenDocument files \(converted with LibreOffice\)/);
+    await pick(app, ["/home/user/Sunday hymns.pptx"]);
+    await app.page.getByRole("button", { name: "Add slides…" }).click();
+    await app.page.waitForFunction(() => document.querySelectorAll(".pres-dock .pres-item").length === 3);
+    expect(await itemRefs(app)).toEqual(["John 3:16–17", deckName, "Sunday hymns.pptx"]);
+    await items(app).nth(2).locator(".pres-item-go").click();
+    await showing(app, "Sunday hymns.pptx · 1 of 3");
+  });
+
+  it("says what's needed when there's nothing to convert PowerPoint files with", async () => {
+    await withPassageAndDeck();
+    await app.page.evaluate(() =>
+      // @ts-expect-error the harness's stand-in for Tauri's bridge
+      window.__TAURI_INTERNALS__.invoke("mock:set_converter", { name: null }),
+    );
+    // Asked again each time presenting starts.
+    await app.page.getByRole("button", { name: "Present", exact: true }).click();
+    await app.page.getByRole("button", { name: "Present", exact: true }).click();
+    await dock(app).waitFor();
+    await app.page.getByLabel("Active playlist").selectOption({ label: "Sunday" });
+    await app.page.waitForFunction(() => document.querySelector(".pres-hint")?.textContent?.startsWith("PDFs or pictures."));
+    expect(await dock(app).locator(".pres-hint").textContent()).toContain("install LibreOffice");
+
+    await pick(app, ["/home/user/Sunday.pptx"]);
+    await app.page.getByRole("button", { name: "Add slides…" }).click();
+    await app.page.waitForSelector(".toast");
+    expect(await app.page.locator(".toast").textContent()).toMatch(/needs LibreOffice .* Or save the file as a PDF/);
+    expect(await items(app).count()).toBe(2);
+  });
+
+  it("says so when LibreOffice can't convert a file", async () => {
+    await withPassageAndDeck();
+    await pick(app, ["/home/user/broken.pptx"]);
+    await app.page.getByRole("button", { name: "Add slides…" }).click();
+    await app.page.waitForSelector(".toast");
+    expect(await app.page.locator(".toast").textContent()).toMatch(/LibreOffice couldn't convert broken\.pptx/);
+    expect(await items(app).count()).toBe(2);
   });
 
   it("offers no Add slides button until a playlist is chosen", async () => {

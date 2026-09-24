@@ -5,6 +5,7 @@ use crate::strongs::{self, StrongsEntry, VerseTags};
 use crate::cards;
 use crate::crossrefs::{self, CrossRef};
 use crate::playlists::{self, NewItem, Playlist};
+use crate::convert;
 use crate::decks;
 use crate::AppState;
 use std::path::PathBuf;
@@ -209,6 +210,32 @@ pub async fn import_slides(app: AppHandle, state: State<'_, AppState>, playlist:
 #[tauri::command]
 pub async fn read_slide_pdf(path: PathBuf) -> Result<tauri::ipc::Response> {
     Ok(tauri::ipc::Response::new(decks::read_pdf(&path)?))
+}
+
+/// The program presentation files (.pptx and the like) would be converted with, e.g. "LibreOffice",
+/// or null when none is installed.
+#[tauri::command]
+pub fn office_converter() -> Option<&'static str> {
+    convert::find_converter().map(|(c, _)| c.label())
+}
+
+/// Converts a presentation file to a PDF (sent raw) with an installed office suite, for the webview
+/// to draw like any other PDF. Runs off the async runtime's threads: a conversion takes seconds.
+#[tauri::command]
+pub async fn convert_slides_to_pdf(app: AppHandle, path: PathBuf) -> Result<tauri::ipc::Response> {
+    let profile = app.path().app_cache_dir()?.join("libreoffice-profile");
+    let pdf = tauri::async_runtime::spawn_blocking(move || {
+        let (_, program) = convert::find_converter().ok_or_else(|| {
+            db::Error::Invalid(
+                "Adding PowerPoint or Keynote files needs LibreOffice (free, from libreoffice.org). Or save the file as a PDF and add that."
+                    .into(),
+            )
+        })?;
+        convert::convert_to_pdf(&path, &program, &profile, convert::TIMEOUT)
+    })
+    .await
+    .map_err(|e| db::Error::Invalid(format!("The conversion stopped unexpectedly ({e}).")))??;
+    Ok(tauri::ipc::Response::new(pdf))
 }
 
 /// Adds a PDF's pages, rendered to PNGs by the webview, to the end of a playlist as one deck. The

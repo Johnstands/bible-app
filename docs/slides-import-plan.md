@@ -4,8 +4,8 @@ Adding slide decks (PowerPoint, Keynote, PDF, plain images) to a presentation-mo
 service can go *welcome slide → Psalm 100 → song lyrics → John 3:16 → announcements* and
 Next/Previous steps straight through all of it.
 
-Status: **steps 1–2 of 4 built** (image slides, click-to-jump, PDF import), on branch
-`slides-import`, not merged.
+Status: **steps 1–3 of 4 built** (image slides, click-to-jump, PDF import, .pptx via LibreOffice),
+on branch `slides-import`, not merged.
 See "Progress" at the end.
 
 ## What the user sees
@@ -295,4 +295,39 @@ refusals, size limit, `read_pdf` only reading PDFs); `npm test` 135 (`slideImpor
 
 **Not verified:** a PDF import inside the actual Tauri window, and anything on macOS/Windows.
 
-### Next: step 3 (LibreOffice .pptx/.odp → PDF → step 2)
+### Step 3 — done (2026-09-25)
+
+`.pptx`/`.ppt`/`.pptm`/`.ppsx`/`.pps`/`.odp`/`.key` go through LibreOffice to a PDF, then through
+step 2 exactly as a picked PDF would. New `src-tauri/src/convert.rs`:
+
+- `find_converter`: looks for `soffice` in the usual places per platform (a pure, tested
+  `libreoffice_candidates`: PATH, `/usr/lib/libreoffice`, `/opt`, snap; `/Applications/LibreOffice.app`
+  and `~/Applications`; `Program Files\LibreOffice\program\soffice.exe`).
+- `convert_to_pdf`: copies the file to `input.<ext>` in a temp work dir (removed however it ends),
+  so no user-chosen text reaches the command line. Runs `soffice --headless … --convert-to pdf` with
+  its own profile (`-env:UserInstallation`, kept in the app cache dir so later runs start faster, and
+  so it can't hand the job to a LibreOffice window the user has open). A 3-minute timeout **kills
+  the whole process tree** (`soffice` is only a launcher: killing just it would leave LibreOffice
+  running). That uses a process group on Unix and `taskkill /T` on Windows, and a test proves the
+  child is gone. It also has no console window on Windows, and clears an AppImage's
+  library-path/GTK/Python variables for the child. LibreOffice exits 0 even on failure, so success
+  means "the PDF exists".
+- Commands: `office_converter` (name or null, so the dock's hint says whether .pptx works here) and
+  `convert_slides_to_pdf` (raw PDF bytes; runs on `spawn_blocking`).
+
+**Design change for step 4:** PowerPoint and Keynote will also export a **PDF** (both can),
+rather than PNGs as first planned, so they plug into `convert_to_pdf`'s slot and everything after
+stays shared. `Converter` is the enum to extend.
+
+**Verified:** `cargo test` 96 (8 in `convert`, including fake-`soffice` scripts for success,
+no output, and a hang whose child must be killed; the hang test was checked to fail without the
+tree kill), plus **a real conversion** of `src-tauri/tests/fixtures/hymn.pptx` (3 slides, made by
+LibreOffice from a hand-written .fodp) with the installed LibreOffice 26.8, skipped with a note
+where LibreOffice isn't installed. `npm test` 136, `npm run test:ui` 124 (3 new). LibreOffice's PDF
+of that deck was also drawn in **real WebKitGTK** by `renderPdfPages`: 3 × 1920×1080, with the
+deck's exact background color.
+
+**Not verified:** a .pptx import inside the actual Tauri window; LibreOffice on macOS/Windows;
+running from an AppImage.
+
+### Next: step 4 (PowerPoint on Windows, Keynote/PowerPoint on macOS → PDF)

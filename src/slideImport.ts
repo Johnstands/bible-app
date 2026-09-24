@@ -1,6 +1,8 @@
 // Turning picked files into presentation slides. Pictures go to the Rust side as file paths and are
 // copied as they are; a PDF is drawn page by page here with pdf.js (loaded only when a PDF is actually
-// imported, so it costs nothing otherwise) and the pages are sent back as PNGs in one body.
+// imported, so it costs nothing otherwise) and the pages are sent back as PNGs in one body. A
+// presentation file (.pptx and the like) is first turned into a PDF by an office suite installed on
+// the computer (see src-tauri/src/convert.rs), then drawn the same way.
 
 /** The most slides one deck may have; must match `decks::MAX_SLIDES` in the Rust backend. */
 export const MAX_SLIDES = 500;
@@ -8,7 +10,12 @@ export const MAX_SLIDES = 500;
 /** Each page is drawn to fit this box: 1080p, what projectors show. */
 const PAGE_BOX = { width: 1920, height: 1080 };
 
-export const isPdf = (path: string) => /\.pdf$/i.test(path);
+/** Presentation files converted to PDF first; must match `OFFICE_EXTENSIONS` in src-tauri/src/convert.rs. */
+export const OFFICE_EXTENSIONS = ["pptx", "ppt", "pptm", "ppsx", "pps", "odp", "key"];
+
+const extension = (path: string) => /\.([^./\\]+)$/.exec(path)?.[1].toLowerCase() ?? "";
+export const isPdf = (path: string) => extension(path) === "pdf";
+export const isOffice = (path: string) => OFFICE_EXTENSIONS.includes(extension(path));
 
 /** The file name at the end of a path, with either separator. */
 export const baseName = (path: string) => path.split(/[\\/]/).pop() || path;

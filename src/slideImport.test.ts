@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { baseName, encodeFrames, fitPage, isPdf } from "./slideImport";
+import { baseName, encodeFrames, fitPage, isOffice, isPdf } from "./slideImport";
 
 describe("encodeFrames", () => {
   it("prefixes each part with its little-endian length", () => {
@@ -35,6 +35,11 @@ describe("file names", () => {
   it("recognizes PDFs whatever the case", () => {
     expect(["a.pdf", "B.PDF", "c.Pdf"].every(isPdf)).toBe(true);
     expect(["a.png", "pdf", "a.pdf.png"].some(isPdf)).toBe(false);
+  });
+
+  it("recognizes presentation files that need converting", () => {
+    expect(["a.pptx", "B.PPT", "c.odp", "d.key", "C:\\x\\e.ppsx"].every(isOffice)).toBe(true);
+    expect(["a.pdf", "b.png", "pptx", "c.pptx.txt", "/a.pptx/b.png"].some(isOffice)).toBe(false);
   });
 
   it("takes the file name from Windows or Unix paths", () => {

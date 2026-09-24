@@ -1,5 +1,6 @@
 mod cards;
 mod commands;
+mod convert;
 mod crossrefs;
 mod db;
 mod decks;
@@ -79,6 +80,8 @@ pub fn run() {
             commands::import_slides,
             commands::read_slide_pdf,
             commands::import_rendered_slides,
+            commands::office_converter,
+            commands::convert_slides_to_pdf,
             present::present_open,
             present::present_close,
             present::present_status,

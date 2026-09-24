@@ -242,6 +242,11 @@ export const readSlidePdf = (path: string) => invoke<ArrayBuffer>("read_slide_pd
 export const importRenderedSlides = (playlist: number, body: Uint8Array) =>
   invoke<void>("import_rendered_slides", body, { headers: { "x-playlist": String(playlist) } });
 
+/** The program presentation files (.pptx and the like) get converted with, e.g. "LibreOffice", or null if none is installed. */
+export const officeConverter = () => invoke<string | null>("office_converter");
+/** Converts a presentation file to a PDF with that program; takes seconds. */
+export const convertSlidesToPdf = (path: string) => invoke<ArrayBuffer>("convert_slides_to_pdf", { path });
+
 /** Image types a deck can be made from; must match `IMAGE_TYPES` in src-tauri/src/decks.rs. */
 export const SLIDE_IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "webp", "gif"];
 /** The URI scheme slide images are served from; must match `decks::SCHEME` in the Rust backend. */
