@@ -37,3 +37,30 @@ jobs:
         run: npm run test:ui
         env:
           CHROMIUM: /usr/bin/google-chrome
+
+  # Code that only builds on Windows or macOS (converting slides with PowerPoint or Keynote, see
+  # src-tauri/src/convert.rs) would otherwise first be compiled on release day. The slide tests need
+  # no Bible database, so they run here too; the rest need the real one and stay in the job above.
+  other-platforms:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: npm ci
+      - run: npm run build # the app embeds the built frontend
+      - name: A stand-in Bible database (compiling only checks that it exists)
+        shell: bash
+        run: mkdir -p src-tauri/resources && touch src-tauri/resources/bible.db
+      - run: cargo check --all-targets --manifest-path src-tauri/Cargo.toml
+      - run: "cargo test --manifest-path src-tauri/Cargo.toml -- convert:: decks:: playlists::"

@@ -4,8 +4,9 @@ Adding slide decks (PowerPoint, Keynote, PDF, plain images) to a presentation-mo
 service can go *welcome slide → Psalm 100 → song lyrics → John 3:16 → announcements* and
 Next/Previous steps straight through all of it.
 
-Status: **steps 1–3 of 4 built** (image slides, click-to-jump, PDF import, .pptx via LibreOffice),
-on branch `slides-import`, not merged.
+Status: **all 4 steps built** on branch `slides-import`, not merged. Step 4 (PowerPoint on
+Windows, Keynote on macOS) **still needs testing on real Windows and Mac machines**; see the
+checklist under "Step 4".
 See "Progress" at the end.
 
 ## What the user sees
@@ -330,4 +331,60 @@ deck's exact background color.
 **Not verified:** a .pptx import inside the actual Tauri window; LibreOffice on macOS/Windows;
 running from an AppImage.
 
-### Next: step 4 (PowerPoint on Windows, Keynote/PowerPoint on macOS → PDF)
+### Step 4 — built, untested on its platforms (2026-09-25)
+
+`convert.rs` now has three converters behind one interface, all producing a **PDF** that goes
+through step 2:
+
+| Converter | Where | How | Opens |
+|---|---|---|---|
+| PowerPoint | Windows | `powershell.exe` (from `%SystemRoot%`) runs `POWERPOINT_SCRIPT` through COM: `Presentations.Open(in, ReadOnly, not Untitled, no window)`, `SaveAs(out, 32 = ppSaveAsPDF)`, close, and `Quit` only if no other presentation is open. Detected by `reg query HKCR\PowerPoint.Application\CurVer`. | all but `.key` |
+| Keynote | macOS | `osascript` runs `KEYNOTE_SCRIPT`: open, `export … as PDF`, close without saving, quit only if it wasn't running. Detected by `Keynote.app` in `/Applications` or `~/Applications`. | all but `.odp` |
+| LibreOffice | anywhere | as in step 3 | everything |
+
+- `find_tools()` lists what's installed, best first; `tools_for(ext)` filters by what opens that
+  file; `convert_with_best` tries each in turn and **falls back** to the next if one fails (not
+  for password-protected files).
+- **Paths never enter script text:** PowerShell reads them from `BIBLE_APP_INPUT`/`BIBLE_APP_OUTPUT`,
+  and AppleScript takes them as `argv`. Tests check both commands' exact arguments and environment
+  on Linux.
+- **Password-protected .pptx/.pptm/.ppsx are refused up front**, detected by the OLE header Office
+  wraps encrypted files in, since PowerPoint would otherwise sit at an invisible password prompt.
+- Failure messages now end with the tail of what the converter printed (PowerShell and AppleScript
+  errors explain themselves), for diagnosing on machines we can't see.
+- The scratch folder moved from the system temp dir to the **app cache dir**. That's hopefully
+  friendlier to sandboxed Keynote writing its output (unverified), and it keeps LibreOffice's profile
+  next to it.
+- **`src-tauri/Info.plist`** adds `NSAppleEventsUsageDescription` (Tauri merges this file
+  automatically; checked in tauri-codegen's source). Without it macOS refuses to let the app control
+  Keynote, with no prompt. The macOS build isn't Apple-signed, so no hardened-runtime entitlement is
+  needed. If it's ever signed and notarized, add `com.apple.security.automation.apple-events`.
+- **PowerPoint for Mac is deliberately not used.** It's sandboxed, and saving to a path outside its
+  container triggers "grant access" dialogs that automation can't answer. Keynote is on every Mac
+  and opens .pptx.
+- **CI:** new `other-platforms` job (windows-latest, macos-latest) runs `cargo check --all-targets`
+  and the `convert::`/`decks::`/`playlists::` tests. Until now, Windows/macOS-only code (including
+  step 3's) was first compiled on release day. It runs on pull requests, so it takes effect once
+  this branch has a PR.
+
+**Verified here (Linux):** `cargo test` 102 (tool choice per file type, fallback,
+password refusal, both scripted commands' arguments/environment, converter-output tail in errors,
+plus step 3's tests); `npm test` 136; `npm run test:ui` 124; build.
+
+**Manual checklist (needs the machines):**
+- **Windows + PowerPoint:** Add slides… → a normal .pptx. The dock should say "converted with
+  PowerPoint" and the slides should match PowerPoint. Then:
+  - a 4:3 deck (letterboxed);
+  - a deck while PowerPoint is already open with another file (that file must stay open, and
+    PowerPoint must not quit);
+  - a password-protected .pptx (clean message, no hang);
+  - a filename with spaces, quotes, `$` or accents;
+  - a `.key` file (should go to LibreOffice if installed, else the "needs…" message).
+- **Windows without PowerPoint, with LibreOffice:** it should say "converted with LibreOffice".
+- **Mac:** Add slides… → a .pptx and a .key. The first time, macOS should ask "allow KJV Reader's
+  Bible to control Keynote?"; allow it. Check the slides appear, and Keynote quits afterwards if it
+  wasn't open before. If the export fails with a permissions error, that's the sandbox question
+  above: note the message in the toast. With permission denied (System Settings → Privacy &
+  Security → Automation), it should fall back to LibreOffice if installed, else show the error.
+- **Any machine with nothing installed:** .pptx gives the "needs PowerPoint, Keynote or
+  LibreOffice… or save it as a PDF" message; PDFs and pictures still work.

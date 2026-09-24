@@ -238,8 +238,8 @@ export function createBackend({ update = null } = {}) {
     // Like the real thing: a presentation becomes a (three-page) PDF, unless it's "broken".
     convert_slides_to_pdf: ({ path }) => {
       const name = path.split("/").pop();
-      if (!converter) throw new Error("Adding PowerPoint or Keynote files needs LibreOffice (free, from libreoffice.org). Or save the file as a PDF and add that.");
-      if (/broken/i.test(path)) throw new Error(`LibreOffice couldn't convert ${name}. It may be damaged or password-protected; try saving it as a PDF and adding that.`);
+      if (!converter) throw new Error("Adding this kind of file needs PowerPoint, Keynote or LibreOffice (free, from libreoffice.org). Or save it as a PDF and add that.");
+      if (/broken/i.test(path)) throw new Error(`${converter} couldn't convert ${name}. It may be damaged; try saving it as a PDF and adding that.`);
       return { __bytes: makePdf(3).toString("base64") };
     },
     "mock:set_converter": ({ name }) => { converter = name; },

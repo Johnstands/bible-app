@@ -212,26 +212,20 @@ pub async fn read_slide_pdf(path: PathBuf) -> Result<tauri::ipc::Response> {
     Ok(tauri::ipc::Response::new(decks::read_pdf(&path)?))
 }
 
-/// The program presentation files (.pptx and the like) would be converted with, e.g. "LibreOffice",
+/// The program PowerPoint files would be converted with ("PowerPoint", "Keynote" or "LibreOffice"),
 /// or null when none is installed.
 #[tauri::command]
 pub fn office_converter() -> Option<&'static str> {
-    convert::find_converter().map(|(c, _)| c.label())
+    convert::tools_for("pptx", &convert::find_tools()).first().map(|t| t.converter.label())
 }
 
-/// Converts a presentation file to a PDF (sent raw) with an installed office suite, for the webview
-/// to draw like any other PDF. Runs off the async runtime's threads: a conversion takes seconds.
+/// Converts a presentation file to a PDF (sent raw) with the best installed program, for the
+/// webview to draw like any other PDF. Runs off the async runtime's threads: a conversion takes seconds.
 #[tauri::command]
 pub async fn convert_slides_to_pdf(app: AppHandle, path: PathBuf) -> Result<tauri::ipc::Response> {
-    let profile = app.path().app_cache_dir()?.join("libreoffice-profile");
+    let cache = app.path().app_cache_dir()?;
     let pdf = tauri::async_runtime::spawn_blocking(move || {
-        let (_, program) = convert::find_converter().ok_or_else(|| {
-            db::Error::Invalid(
-                "Adding PowerPoint or Keynote files needs LibreOffice (free, from libreoffice.org). Or save the file as a PDF and add that."
-                    .into(),
-            )
-        })?;
-        convert::convert_to_pdf(&path, &program, &profile, convert::TIMEOUT)
+        convert::convert_with_best(&path, &convert::find_tools(), &cache, &cache.join("libreoffice-profile"), convert::TIMEOUT)
     })
     .await
     .map_err(|e| db::Error::Invalid(format!("The conversion stopped unexpectedly ({e}).")))??;

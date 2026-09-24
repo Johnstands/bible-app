@@ -204,7 +204,7 @@ describe("slides in a playlist", () => {
     await pick(app, ["/home/user/Sunday.pptx"]);
     await app.page.getByRole("button", { name: "Add slides…" }).click();
     await app.page.waitForSelector(".toast");
-    expect(await app.page.locator(".toast").textContent()).toMatch(/needs LibreOffice .* Or save the file as a PDF/);
+    expect(await app.page.locator(".toast").textContent()).toMatch(/needs PowerPoint, Keynote or LibreOffice .* Or save it as a PDF/);
     expect(await items(app).count()).toBe(2);
   });
 
