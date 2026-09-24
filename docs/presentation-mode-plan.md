@@ -5,7 +5,7 @@ session) so work can resume later without needing this conversation's history.
 
 ## Status as of this writing
 
-Branch: `presentation-mode` (not merged into `main`).
+Merged into `main` on 2026-09-24 (merge commit `60a2f73`, from the `presentation-mode` branch). Not yet pushed or released.
 
 - Commit `96d0bdb` — first working version: ad-hoc presenting, a saved/queued "service" of
   passages, a modal control panel, auto-detected second-monitor fullscreen with a single-monitor
@@ -31,12 +31,12 @@ Branch: `presentation-mode` (not merged into `main`).
     RENAME`, with a backup at `user.db.bak-before-playlist-rename`. **After this branch is released,
     never edit migration 4 again. Add a new migration instead.**
 
-Nothing is uncommitted; nothing has been pushed or merged yet.
+Nothing is uncommitted.
 
 **Not yet done / open items:**
 - Manual multi-monitor QA has not been performed (only headless-Chromium and a real single-monitor
   Tauri run were tested) — see the Verification section below for the exact checklist.
-- Push / merge into `main`.
+- Push to origin, then cut a release (after which migration 4 is frozen — see above).
 
 (The file-by-file notes below were written before the internal rename, so they still use the old
 `Service`/`services.rs` names.)
