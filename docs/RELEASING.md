@@ -89,4 +89,6 @@ system has none of those libraries. To check it after a release, run the AppImag
 ## What is checked on every push
 
 The **CI** workflow runs the type check, the unit tests, the Rust tests (including the 100 ms search bar in a release
-build) and the UI tests in headless Chrome.
+build) and the UI tests in headless Chrome. A second job compiles the app on Windows and macOS and runs the slide-import Rust
+tests there, so code that only builds on those systems (the PowerPoint and Keynote converters in
+`src-tauri/src/convert.rs`) is compiled before release day, not on it.
