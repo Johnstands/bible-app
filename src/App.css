@@ -2466,15 +2466,37 @@ kbd {
   width: 100%;
   height: 100%;
   position: relative;
+  overflow: hidden;
+  background: #000;
+  font-family: var(--font-ui);
+}
+
+/* One whole screen; a new one stacks on top of the last (see PresentationView.tsx). */
+.present-layer {
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  font-family: var(--font-ui);
 }
 
-.present-view[data-blank] {
-  background: #000 !important;
+/* The crossfade: the new screen fades in over the old one, which stays fully drawn beneath it. Its
+   length comes from FADE_MS, and it isn't cut by the reduced-motion setting: that's about the
+   operator's own screen, and this is what the congregation sees. */
+.present-layer--in {
+  animation-name: present-fade-in;
+  animation-timing-function: ease-in-out;
+  animation-fill-mode: both;
+}
+
+@keyframes present-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .present-slide {

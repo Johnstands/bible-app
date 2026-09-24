@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildQueue, buildSlides, itemAt, slideCaption } from "./presentation";
-import type { Passage, QueueEntry, QueuedDeck } from "./presentation";
+import { buildQueue, buildSlides, itemAt, screenKey, slideCaption, STANDBY_STATE } from "./presentation";
+import type { Passage, PresentationState, QueueEntry, QueuedDeck } from "./presentation";
 
 const john3: Passage = {
   book: 43,
@@ -126,5 +126,35 @@ describe("itemAt", () => {
   it("is -1 past the end or for an empty queue", () => {
     expect(itemAt(items, 6)).toBe(-1);
     expect(itemAt([], 0)).toBe(-1);
+  });
+});
+
+describe("screenKey", () => {
+  const verse = buildSlides(john3, "verse")[0];
+  const picture = buildQueue([{ name: "Songs", srcs: ["s1", "s2"] }], "verse").slides[0];
+  const on = (over: Partial<PresentationState>): PresentationState => ({ ...STANDBY_STATE, ...over });
+
+  it("is the same for states that look the same, so nothing fades", () => {
+    expect(screenKey(on({ slide: verse, preload: "a" }))).toBe(screenKey(on({ slide: verse, preload: "b" })));
+    expect(screenKey(on({ slide: verse, transition: "fade" }))).toBe(screenKey(on({ slide: verse, transition: "cut" })));
+    // Blank hides everything, whatever would be under it.
+    expect(screenKey(on({ blank: true, slide: verse }))).toBe(screenKey(on({ blank: true, slide: picture })));
+    // A picture is shown on black whatever the verse color setting.
+    expect(screenKey(on({ slide: picture, theme: "dark" }))).toBe(screenKey(on({ slide: picture, theme: "light" })));
+  });
+
+  it("differs whenever the screen would look different", () => {
+    const keys = [
+      on({}),
+      on({ theme: "light" }),
+      on({ blank: true }),
+      on({ slide: verse }),
+      on({ slide: verse, theme: "light" }),
+      on({ slide: { ...verse, label: "Call to worship" } }),
+      on({ slide: buildSlides(john3, "verse")[1] }),
+      on({ slide: picture }),
+      on({ slide: buildQueue([{ name: "Songs", srcs: ["s1", "s2"] }], "verse").slides[1] }),
+    ].map(screenKey);
+    expect(new Set(keys).size).toBe(keys.length);
   });
 });

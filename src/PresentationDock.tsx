@@ -1,8 +1,8 @@
 import { useState } from "react";
 import type { NewPlaylistItem, PresentStatus, Playlist, PlaylistItem } from "./api";
 import { slideSrc, toNewPlaylistItem } from "./api";
-import { GRANULARITY_LABELS, PRESENT_THEMES, slideCaption } from "./presentation";
-import type { Granularity, ItemSpan, PresentationState, PresentSlide, PresentTheme } from "./presentation";
+import { GRANULARITY_LABELS, PRESENT_THEMES, slideCaption, TRANSITION_LABELS } from "./presentation";
+import type { Granularity, ItemSpan, PresentationState, PresentSlide, PresentTheme, Transition } from "./presentation";
 import { PresentationView } from "./PresentationView";
 import { referenceLabel } from "./verses";
 
@@ -45,6 +45,8 @@ interface Props {
   onGranularity: (g: Granularity) => void;
   theme: PresentTheme;
   onTheme: (t: PresentTheme) => void;
+  transition: Transition;
+  onTransition: (t: Transition) => void;
 
   status: PresentStatus;
   onStop: () => void;
@@ -62,7 +64,7 @@ export function PresentationDock({
   titleOf,
   presentState, slide, slideIndex, slideCount, usingAdHoc, returnLabel, onReturnToPlaylist,
   itemSpans, liveItem, liveSlide, onJumpToItem, onJumpToSlide, importStatus, converter, onAddSlides, onNext, onPrev,
-  blank, onToggleBlank, granularity, onGranularity, theme, onTheme,
+  blank, onToggleBlank, granularity, onGranularity, theme, onTheme, transition, onTransition,
   status, onStop, onRedetect,
 }: Props) {
   const [newName, setNewName] = useState("");
@@ -177,6 +179,13 @@ export function PresentationDock({
               onClick={() => onTheme(theme === "dark" ? "light" : "dark")}
             >
               {PRESENT_THEMES[theme].label}
+            </button>
+            <button
+              aria-label={`Between slides: ${TRANSITION_LABELS[transition]}. Click to switch.`}
+              title="Toggle between a quick fade and an instant cut from one slide to the next"
+              onClick={() => onTransition(transition === "fade" ? "cut" : "fade")}
+            >
+              {TRANSITION_LABELS[transition]}
             </button>
           </div>
         </section>
