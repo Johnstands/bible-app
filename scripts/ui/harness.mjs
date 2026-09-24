@@ -8,7 +8,7 @@ export const APP_URL = process.env.APP_URL ?? "http://localhost:1430";
 
 // Stands in for Tauri's invoke bridge and forwards commands to the mock backend. There is only ever
 // one page here, standing in for the main window; presentation mode's event plumbing (see App.tsx,
-// Presentation.tsx) is stubbed inert rather than wired up, since a dedicated presentation window can't
+// PresentationWindow.tsx) is stubbed inert rather than wired up, since a dedicated presentation window can't
 // exist in a single headless page anyway — the mock backend's present_open always answers "inline"
 // for exactly that reason (see mock-backend.mjs), so nothing here ever needs to actually deliver.
 const bridge = `

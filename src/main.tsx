@@ -10,7 +10,7 @@ import "@fontsource-variable/source-serif-4/wght-italic.css";
 import "@fontsource-variable/inter";
 import "./theme.css";
 import App from "./App";
-import { Presentation } from "./Presentation";
+import { PresentationWindow } from "./PresentationWindow";
 import { PRESENTATION_WINDOW } from "./presentation";
 
 // The dedicated presentation window loads this same bundle (see src-tauri/src/present.rs); which
@@ -19,6 +19,6 @@ const isPresentation = getCurrentWindow().label === PRESENTATION_WINDOW;
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
-    {isPresentation ? <Presentation /> : <App />}
+    {isPresentation ? <PresentationWindow /> : <App />}
   </React.StrictMode>,
 );

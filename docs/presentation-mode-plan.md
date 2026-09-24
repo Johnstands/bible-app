@@ -89,7 +89,8 @@ window) and small (the dock's live preview) with correct proportions in both. Fo
 caption/reference/standby text are now computed from the container width in JS (they used to be
 fixed `rem`/`vh` values, which looked fine full-screen but would have overflowed a small preview).
 
-**`src/Presentation.tsx`** — wraps `<PresentationView>` in a new full-bleed `.present-window` div;
+**`src/Presentation.tsx`** (since renamed `PresentationWindow.tsx`: on Windows and macOS its name
+clashed with `presentation.ts`, differing only in case, and broke the build) — wraps `<PresentationView>` in a new full-bleed `.present-window` div;
 otherwise unchanged (still does the `present:ready`/`present:state` event handshake).
 
 **`src/App.tsx`**:

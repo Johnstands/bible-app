@@ -1,5 +1,5 @@
 // Presentation mode: turning a passage into slides to project, independent of how they get on screen
-// (a dedicated window or an inline overlay — see Presentation.tsx, PresentationView.tsx).
+// (a dedicated window or an inline overlay — see PresentationWindow.tsx, PresentationView.tsx).
 
 import { referenceLabel } from "./verses";
 

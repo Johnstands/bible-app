@@ -14,7 +14,7 @@ const MAIN_WINDOW = "main";
  * "present:state" handling), which also covers the case where the window opens after presenting has
  * already started.
  */
-export function Presentation() {
+export function PresentationWindow() {
   const [state, setState] = useState<PresentationState>(STANDBY_STATE);
 
   useEffect(() => {

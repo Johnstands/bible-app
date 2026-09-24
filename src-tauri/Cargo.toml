@@ -30,6 +30,10 @@ tauri-plugin-process = "2"
 tauri-plugin-dialog = "2"
 
 
+# Stopping a hung slide converter along with everything it started (see src/convert.rs).
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
 [profile.release]
 codegen-units = 1

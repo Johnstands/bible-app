@@ -14,7 +14,7 @@ interface Props {
  * Renders whatever `state` says to show: a blank/black screen, a standby message, the current
  * verse slide's text as large as will fit its container, or an imported slide's picture. Sizes itself entirely from the box it's given
  * (a `ResizeObserver` on its own root, not the window), so the same component works full-bleed as
- * the whole UI of the dedicated presentation window (see Presentation.tsx) and small, as the control
+ * the whole UI of the dedicated presentation window (see PresentationWindow.tsx) and small, as the control
  * center's live preview (see PresentationDock.tsx) — the truest possible preview of what's on screen.
  */
 export function PresentationView({ state }: Props) {

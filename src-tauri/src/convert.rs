@@ -296,13 +296,17 @@ fn command_for(tool: &Tool, work: &Path, input: &Path, profile: &Path) -> Result
 /// Stops a process and everything it started: `soffice` is only a launcher, and killing just it
 /// would leave the real LibreOffice running.
 fn kill_tree(child: &mut std::process::Child) {
-    let pid = child.id().to_string();
+    // The child leads its own process group (see `convert_to_pdf`), whose id is its pid; a negative
+    // pid signals the whole group.
     #[cfg(unix)]
-    let _ = Command::new("kill").args(["-KILL", &format!("-{pid}")]).status();
+    if let Ok(group) = i32::try_from(child.id()) {
+        // SAFETY: kill(2) only sends a signal; no memory is involved.
+        unsafe { libc::kill(-group, libc::SIGKILL) };
+    }
     #[cfg(windows)]
     {
         let mut taskkill = Command::new("taskkill");
-        taskkill.args(["/T", "/F", "/PID", &pid]);
+        taskkill.args(["/T", "/F", "/PID", &child.id().to_string()]);
         hide_window(&mut taskkill);
         let _ = taskkill.status();
     }
@@ -627,8 +631,13 @@ mod tests {
             assert!(started.elapsed() < Duration::from_secs(5));
 
             let child: u32 = std::fs::read_to_string(fake.dir.join("child.pid")).unwrap().trim().parse().unwrap();
-            // `kill -0` succeeds only while the process exists.
-            let alive = || Command::new("kill").args(["-0", &child.to_string()]).stderr(Stdio::null()).status().unwrap().success();
+            // Still running: `ps` knows it, and not as a zombie (dead, just not yet collected by
+            // whatever process adopted it, which doesn't count as left running).
+            let alive = || {
+                let out = Command::new("ps").args(["-o", "stat=", "-p", &child.to_string()]).output().unwrap();
+                let state = String::from_utf8_lossy(&out.stdout);
+                !state.trim().is_empty() && !state.trim_start().starts_with('Z')
+            };
             let deadline = Instant::now() + Duration::from_secs(2);
             while alive() && Instant::now() < deadline {
                 std::thread::sleep(Duration::from_millis(50));
