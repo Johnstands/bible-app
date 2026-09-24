@@ -1,7 +1,16 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { emitTo, listen } from "@tauri-apps/api/event";
 import "./App.css";
-import { EMPTY_MARKS, getChapter, getMarks, getPlans, getWordTags, HIGHLIGHT_COLORS, listBooks, listChapters, saveNote, setHighlight, setPlanDay, startPlan, stopPlan, toggleBookmark } from "./api";
-import type { Book, ChapterMarks, HighlightColor, StartedPlan, Verse, WordTag } from "./api";
+import {
+  createPlaylist, deletePlaylist, EMPTY_MARKS, getChapter, getMarks, getPlans, getWordTags, HIGHLIGHT_COLORS, listBooks,
+  listChapters, listPlaylists, presentClose, presentOpen, presentStatus as fetchPresentStatus, renamePlaylist, saveNote,
+  savePlaylistItems, setHighlight, setPlanDay, startPlan, stopPlan, toggleBookmark, toNewPlaylistItem,
+} from "./api";
+import type { Book, ChapterMarks, HighlightColor, NewPlaylistItem, PresentStatus, Playlist, StartedPlan, Verse, WordTag } from "./api";
+import { buildQueueSlides, buildSlides, PRESENTATION_WINDOW } from "./presentation";
+import type { Passage, PresentationState, PresentSlide } from "./presentation";
+import { loadPresentationPrefs, savePresentationPrefs } from "./presentationSettings";
+import { PresentationDock } from "./PresentationDock";
 import glossaryText from "../data/glossary.txt?raw";
 import { TRANSLATION, TRANSLATION_NAME } from "./config";
 import { Chapter } from "./Chapter";
@@ -123,6 +132,17 @@ function App() {
   const [startedPlans, setStartedPlans] = useState<StartedPlan[]>([]);
   const [shareFor, setShareFor] = useState<{ reference: string; text: string } | null>(null);
   const [refsFor, setRefsFor] = useState<(RefSource & { label: string; text: string }) | null>(null);
+
+  // ---- Presentation mode: a saved, orderable "playlist" of passages, plus presenting anything ad hoc ----
+  const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [activePlaylistId, setActivePlaylistId] = useState<number | null>(null);
+  const [queueSlides, setQueueSlides] = useState<PresentSlide[]>([]);
+  const [queueIndex, setQueueIndex] = useState(0);
+  const [adHoc, setAdHoc] = useState<PresentSlide[] | null>(null);
+  const [adHocIndex, setAdHocIndex] = useState(0);
+  const [presentPrefs, setPresentPrefs] = useState(loadPresentationPrefs);
+  const [blank, setBlank] = useState(false);
+  const [liveStatus, setLiveStatus] = useState<PresentStatus>({ open: false, monitorLabel: null });
   const [copied, setCopied] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -232,6 +252,27 @@ function App() {
         announce(done ? `Day ${day} of ${name} marked done.` : `Day ${day} of ${name} marked not done.`);
       })
       .catch((e) => setError(String(e)));
+
+  // Presentation mode's saved playlists, and resyncing with wherever the live view already is (it can
+  // outlive this component reloading, e.g. after an update installs).
+  useEffect(() => {
+    listPlaylists().then(setPlaylists).catch((e) => console.error(e));
+    fetchPresentStatus().then(setLiveStatus).catch((e) => console.error(e));
+  }, []);
+  const refreshPlaylists = () => listPlaylists().then(setPlaylists).catch((e) => setNotice(`That didn’t save: ${e}`));
+  const createNewPlaylist = (name: string) =>
+    createPlaylist(name)
+      .then((id) => {
+        setActivePlaylistId(id);
+        return refreshPlaylists();
+      })
+      .catch((e) => setNotice(`That didn’t save: ${e}`));
+  const renameActivePlaylist = (id: number, name: string) => void renamePlaylist(id, name).then(refreshPlaylists).catch((e) => setNotice(`That didn’t save: ${e}`));
+  const deleteActivePlaylist = (id: number) => {
+    if (activePlaylistId === id) setActivePlaylistId(null);
+    void deletePlaylist(id).then(refreshPlaylists).catch((e) => setNotice(`That didn’t save: ${e}`));
+  };
+  const saveItems = (id: number, items: NewPlaylistItem[]) => void savePlaylistItems(id, items).then(refreshPlaylists).catch((e) => setNotice(`That didn’t save: ${e}`));
 
   // The glossary needs the book list to resolve its verse references. A bad entry must not take the reader down.
   const glossary = useMemo(() => {
@@ -494,6 +535,138 @@ function App() {
     setNote(null);
   };
 
+  // ---- Presentation mode: turning the active playlist into a flowing list of slides, and driving
+  // whichever screen is projecting them (a second window, or this window full-screened) ----
+
+  const activePlaylist = playlists.find((s) => s.id === activePlaylistId) ?? null;
+
+  // Rebuilt whenever the active playlist's passages or the slide granularity change; fetches each
+  // distinct chapter the playlist touches once, however many items come from it.
+  useEffect(() => {
+    if (!activePlaylist || activePlaylist.items.length === 0) {
+      setQueueSlides([]);
+      setQueueIndex(0);
+      return;
+    }
+    let stale = false;
+    const chapters = [...new Set(activePlaylist.items.map((i) => `${i.book}:${i.chapter}`))];
+    Promise.all(
+      chapters.map((key) => {
+        const [b, c] = key.split(":").map(Number);
+        return getChapter(TRANSLATION, b, c).then((verses) => [key, verses] as const);
+      }),
+    )
+      .then((entries) => {
+        if (stale) return;
+        const byChapter = new Map(entries);
+        const passages: Passage[] = activePlaylist.items.flatMap((item) => {
+          const verses = byChapter.get(`${item.book}:${item.chapter}`) ?? [];
+          const end = item.verseEnd ?? item.verse;
+          const included = verses.filter((v) => v.verse >= item.verse && v.verse <= end).map((v) => ({ verse: v.verse, text: v.text }));
+          if (included.length === 0) return [];
+          return [{ book: item.book, chapter: item.chapter, title: bookTitle(item.book), label: item.label ?? undefined, verses: included }];
+        });
+        setQueueSlides(buildQueueSlides(passages, presentPrefs.granularity));
+      })
+      .catch((e) => setNotice(`Couldn’t load the playlist: ${e}`));
+    return () => {
+      stale = true;
+    };
+  }, [activePlaylist?.id, activePlaylist?.items, presentPrefs.granularity]);
+
+  // Keep the queue pointer in range whenever the slide list itself changes shape.
+  useEffect(() => {
+    setQueueIndex((i) => Math.max(0, Math.min(i, Math.max(0, queueSlides.length - 1))));
+  }, [queueSlides.length]);
+
+  const usingAdHoc = adHoc !== null;
+  const currentSlides = adHoc ?? queueSlides;
+  const currentIndex = adHoc ? adHocIndex : queueIndex;
+  const currentSlide: PresentSlide | null = currentSlides[currentIndex] ?? null;
+  const setCurrentIndex = adHoc ? setAdHocIndex : setQueueIndex;
+  const presenting = liveStatus.open;
+
+  const presentState: PresentationState = { blank, theme: presentPrefs.theme, slide: currentSlide };
+  const presentStateRef = useRef(presentState);
+  presentStateRef.current = presentState;
+
+  // Pushes the current slide to the dedicated presentation window whenever it's open. The dock's own
+  // live preview is driven directly by `presentState` as a prop, so it needs no event at all.
+  useEffect(() => {
+    if (presenting) void emitTo(PRESENTATION_WINDOW, "present:state", presentState);
+  }, [presenting, presentState]);
+
+  /** Clears whatever was on screen, so the next time presenting starts it doesn't pick up a stale
+   *  ad-hoc passage (or a blanked screen) left over from before. */
+  const resetPresentation = () => {
+    setAdHoc(null);
+    setAdHocIndex(0);
+    setBlank(false);
+  };
+
+  // The presentation window announces itself once mounted (it may open after presenting already
+  // started, or reload independently), and Rust announces when it's closed from the OS side.
+  useEffect(() => {
+    const unReady = listen("present:ready", () => {
+      void emitTo(PRESENTATION_WINDOW, "present:state", presentStateRef.current);
+    });
+    const unClosed = listen("present://closed", () => {
+      setLiveStatus({ open: false, monitorLabel: null });
+      resetPresentation();
+    });
+    return () => {
+      void unReady.then((f) => f());
+      void unClosed.then((f) => f());
+    };
+  }, []);
+
+  const startPresenting = () => presentOpen().then(setLiveStatus).catch((e) => setNotice(`Couldn’t start presenting: ${e}`));
+  const stopPresenting = () =>
+    presentClose()
+      .then((s) => {
+        setLiveStatus(s);
+        resetPresentation();
+      })
+      .catch((e) => setNotice(`Couldn’t stop presenting: ${e}`));
+  const redetectDisplay = () => presentOpen().then(setLiveStatus).catch((e) => setNotice(`Couldn’t redetect the display: ${e}`));
+  const togglePresenting = () => (presenting ? void stopPresenting() : void startPresenting());
+
+  const goNext = () => setCurrentIndex((i) => Math.min(i + 1, currentSlides.length - 1));
+  const goPrev = () => setCurrentIndex((i) => Math.max(i - 1, 0));
+  const toggleBlank = () => setBlank((b) => !b);
+  const setGranularity = (granularity: typeof presentPrefs.granularity) => {
+    const next = { ...presentPrefs, granularity };
+    setPresentPrefs(next);
+    savePresentationPrefs(next);
+  };
+  const setPresentTheme = (theme: typeof presentPrefs.theme) => {
+    const next = { ...presentPrefs, theme };
+    setPresentPrefs(next);
+    savePresentationPrefs(next);
+  };
+
+  /** Presents the reader's current selection right away. Only meaningful once presenting is already
+   *  on — entering presentation mode (which opens a real window) stays behind the topbar toggle. */
+  const presentNow = () => {
+    if (!loaded || chosen.length === 0) return;
+    const verses = loaded.verses.filter((v) => selected.has(v.verse)).map((v) => ({ verse: v.verse, text: v.text }));
+    const passage: Passage = { book: loaded.book, chapter: loaded.chapter, title, verses };
+    setAdHoc(buildSlides(passage, presentPrefs.granularity));
+    setAdHocIndex(0);
+  };
+  const returnToPlaylist = () => setAdHoc(null);
+
+  /** The reader's current selection, ready to add to a playlist, or null when nothing is selected. */
+  const pendingItem: NewPlaylistItem | null =
+    loaded && chosen.length > 0
+      ? { book: loaded.book, chapter: loaded.chapter, ...span(chosen), label: null }
+      : null;
+  /** Adds the reader's current selection to the active playlist; null when there's nothing to add to. */
+  const addPendingToPlaylist =
+    activePlaylist && pendingItem
+      ? () => saveItems(activePlaylist.id, [...activePlaylist.items.map(toNewPlaylistItem), pendingItem])
+      : null;
+
   // ---- Keyboard: a verse cursor, and stepping through the glossary words ----
 
   const verseNumbers = loaded?.verses.map((v) => v.verse) ?? [];
@@ -643,7 +816,9 @@ function App() {
         e.preventDefault();
         toggleAtCursor();
       } else if (e.key === "w" || e.key === "W") stepWord(e.shiftKey ? -1 : 1);
-      else if (chosen.length > 0) {
+      else if (chosen.length > 0 && presenting) {
+        if (e.key === "g") presentNow();
+      } else if (chosen.length > 0) {
         if (e.key === "b") bookmarkSelection();
         else if (e.key === "n") openNote();
         else if (e.key === "i") openShare();
@@ -662,13 +837,21 @@ function App() {
     <>
       {/* While a dialog is open the page behind it can't be focused or read: the dialog is all there is. */}
       <div className="app-shell" inert={overlayOpen}>
-        <header className={`topbar${idle && !overlayOpen ? " is-idle" : ""}`}>
+        <header className={`topbar${idle && !overlayOpen ? " is-idle" : ""}${presenting ? " topbar--dock-open" : ""}`}>
           <button className="location" onClick={openGoto} title={`Go to… (${shortcutLabel("K")} or /)`}>
             {book ? label(pos) : ""}
           </button>
           <div className="topbar-right">
             <button className="topbar-button" onClick={openPlans} title="Reading plans (P)">
               Plans
+            </button>
+            <button
+              className="topbar-button"
+              aria-pressed={presenting}
+              onClick={() => void togglePresenting()}
+              title={presenting ? "Stop presenting" : "Presentation mode: project verses for a church service"}
+            >
+              Present
             </button>
             <button className="topbar-button" onClick={openLibrary} title={`Library: bookmarks, notes and highlights (${shortcutLabel("L")})`}>
               Library
@@ -686,7 +869,7 @@ function App() {
         </header>
 
         <main
-          className="page"
+          className={`page${presenting ? " page--dock-open" : ""}`}
           onClick={(e) => {
             // Clicking the margin or between verses puts the selection away.
             if (!(e.target as HTMLElement).closest(".verse, button")) clearSelection();
@@ -762,7 +945,42 @@ function App() {
             onCopy={copySelection}
             onShare={openShare}
             onRefs={chosen.length === 1 ? openRefs : null}
+            presenting={presenting}
+            onPresentNow={presentNow}
+            onAddToPlaylist={addPendingToPlaylist}
             onClear={clearSelection}
+          />
+        </div>
+      )}
+
+      {presenting && (
+        <div inert={overlayOpen}>
+          <PresentationDock
+            playlists={playlists}
+            activePlaylistId={activePlaylistId}
+            onSelectPlaylist={setActivePlaylistId}
+            onCreatePlaylist={createNewPlaylist}
+            onRenamePlaylist={renameActivePlaylist}
+            onDeletePlaylist={deleteActivePlaylist}
+            onSaveItems={saveItems}
+            titleOf={bookTitle}
+            presentState={presentState}
+            slide={currentSlide}
+            slideIndex={currentIndex}
+            slideCount={currentSlides.length}
+            usingAdHoc={usingAdHoc}
+            onReturnToPlaylist={returnToPlaylist}
+            onNext={goNext}
+            onPrev={goPrev}
+            blank={blank}
+            onToggleBlank={toggleBlank}
+            granularity={presentPrefs.granularity}
+            onGranularity={setGranularity}
+            theme={presentPrefs.theme}
+            onTheme={setPresentTheme}
+            status={liveStatus}
+            onStop={stopPresenting}
+            onRedetect={redetectDisplay}
           />
         </div>
       )}

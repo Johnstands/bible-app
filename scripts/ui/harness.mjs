@@ -6,9 +6,15 @@ import { serve } from "./mock-backend.mjs";
 const CHROMIUM = process.env.CHROMIUM ?? "/usr/bin/chromium";
 export const APP_URL = process.env.APP_URL ?? "http://localhost:1430";
 
-// Stands in for Tauri's invoke bridge and forwards commands to the mock backend.
+// Stands in for Tauri's invoke bridge and forwards commands to the mock backend. There is only ever
+// one page here, standing in for the main window; presentation mode's event plumbing (see App.tsx,
+// Presentation.tsx) is stubbed inert rather than wired up, since a dedicated presentation window can't
+// exist in a single headless page anyway — the mock backend's present_open always answers "inline"
+// for exactly that reason (see mock-backend.mjs), so nothing here ever needs to actually deliver.
 const bridge = `
   window.__TAURI_INTERNALS__ = {
+    metadata: { currentWindow: { label: "main" }, currentWebview: { label: "main" } },
+    transformCallback: () => 0,
     invoke: async (cmd, args) => {
       const res = await fetch("http://127.0.0.1:9100/invoke", { method: "POST", body: JSON.stringify({ cmd, args }) });
       const out = await res.json();
@@ -16,6 +22,7 @@ const bridge = `
       return out.ok;
     },
   };
+  window.__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener: () => {} };
 `;
 
 // `motion: "reduce"` turns the app's animations off, so screenshots never catch a fade half-done.

@@ -21,6 +21,7 @@ const SHORTCUTS: [string[], string][] = [
   [["W", "Shift+W"], "Open the next or previous word's meaning"],
   [["P"], "Reading plans"],
   [["I"], "Make a picture of the selected verses to share"],
+  [["G"], "Project the selected verses (while presentation mode is on)"],
   [["X"], "Cross-references for the selected verse (or the one the cursor is on)"],
   [["S"], "Turn original-language words (Hebrew and Greek) on or off"],
   [["Enter"], "With such a word's card open: list every verse that uses it"],

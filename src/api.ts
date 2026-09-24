@@ -181,6 +181,64 @@ export interface Library {
   highlights: LibraryEntry[];
 }
 
+/** One passage in a saved presentation-mode playlist. */
+export interface PlaylistItem {
+  id: number;
+  book: number;
+  chapter: number;
+  verse: number;
+  verseEnd: number | null;
+  /** An optional caption (e.g. "Call to worship") shown instead of the reference alone. */
+  label: string | null;
+}
+
+/** A saved, reusable list of passages a presenter builds ahead of a church service. */
+export interface Playlist {
+  id: number;
+  name: string;
+  updatedAt: string;
+  items: PlaylistItem[];
+}
+
+/** An item to save into a playlist, in the order given. */
+export interface NewPlaylistItem {
+  book: number;
+  chapter: number;
+  verse: number;
+  verseEnd: number | null;
+  label: string | null;
+}
+
+/** Drops the id, keeping the rest, for re-saving a playlist's own items back (e.g. after reordering). */
+export const toNewPlaylistItem = (i: PlaylistItem): NewPlaylistItem => ({
+  book: i.book,
+  chapter: i.chapter,
+  verse: i.verse,
+  verseEnd: i.verseEnd,
+  label: i.label,
+});
+
+export const listPlaylists = () => invoke<Playlist[]>("list_playlists");
+export const createPlaylist = (name: string) => invoke<number>("create_playlist", { name });
+export const renamePlaylist = (id: number, name: string) => invoke<void>("rename_playlist", { id, name });
+export const deletePlaylist = (id: number) => invoke<void>("delete_playlist", { id });
+/** Replaces a playlist's items with `items`, in order. */
+export const savePlaylistItems = (id: number, items: NewPlaylistItem[]) => invoke<void>("save_playlist_items", { id, items });
+
+/** Where the dedicated presentation window is right now. */
+export interface PresentStatus {
+  open: boolean;
+  /** Set once it's actually fullscreen on an external monitor; null otherwise. */
+  monitorLabel: string | null;
+}
+
+/** Opens (creating if needed) the presentation window: fullscreen on a second monitor if one is
+ *  connected, or an ordinary window otherwise. Safe to call again at any time — it doubles as
+ *  "redetect the display". */
+export const presentOpen = () => invoke<PresentStatus>("present_open");
+export const presentClose = () => invoke<PresentStatus>("present_close");
+export const presentStatus = () => invoke<PresentStatus>("present_status");
+
 export const getMarks = (book: number, chapter: number) => invoke<ChapterMarks>("get_marks", { book, chapter });
 /** Highlights the verses with `color`, or clears their highlights when it is null. */
 export const setHighlight = (book: number, chapter: number, verses: number[], color: HighlightColor | null) =>

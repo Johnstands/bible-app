@@ -4,6 +4,7 @@ use crate::user::{self, ChapterMarks, Library, Note};
 use crate::strongs::{self, StrongsEntry, VerseTags};
 use crate::cards;
 use crate::crossrefs::{self, CrossRef};
+use crate::playlists::{self, NewItem, Playlist};
 use crate::AppState;
 use tauri::{Manager, State};
 
@@ -155,6 +156,33 @@ pub fn delete_note(state: State<AppState>, id: i64) -> Result<()> {
 #[tauri::command]
 pub fn toggle_bookmark(state: State<AppState>, book: u32, chapter: u32, verse: u32) -> Result<bool> {
     user::toggle_bookmark(&state.user.lock().unwrap(), book, chapter, verse)
+}
+
+// Presentation mode's saved playlists: an ordered list of passages built ahead of a church service.
+
+#[tauri::command]
+pub fn list_playlists(state: State<AppState>) -> Result<Vec<Playlist>> {
+    playlists::list_playlists(&state.user.lock().unwrap())
+}
+
+#[tauri::command]
+pub fn create_playlist(state: State<AppState>, name: String) -> Result<i64> {
+    playlists::create_playlist(&state.user.lock().unwrap(), &name)
+}
+
+#[tauri::command]
+pub fn rename_playlist(state: State<AppState>, id: i64, name: String) -> Result<()> {
+    playlists::rename_playlist(&state.user.lock().unwrap(), id, &name)
+}
+
+#[tauri::command]
+pub fn delete_playlist(state: State<AppState>, id: i64) -> Result<()> {
+    playlists::delete_playlist(&state.user.lock().unwrap(), id)
+}
+
+#[tauri::command]
+pub fn save_playlist_items(state: State<AppState>, id: i64, items: Vec<NewItem>) -> Result<()> {
+    playlists::save_playlist_items(&state.user.lock().unwrap(), id, &items)
 }
 
 #[tauri::command]
