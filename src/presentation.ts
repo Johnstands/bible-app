@@ -144,11 +144,35 @@ export const PRESENT_THEMES: Record<PresentTheme, { label: string; bg: string; i
   light: { label: "Light", bg: "#faf6ec", ink: "#241f19", caption: "#7a7060" },
 };
 
+export const TRANSITIONS = ["fade", "cut"] as const;
+export type Transition = (typeof TRANSITIONS)[number];
+export const TRANSITION_LABELS: Record<Transition, string> = { fade: "Fade", cut: "Cut" };
+
+/** How long a fade between two screens takes, in milliseconds. Short, so stepping verse by verse
+ *  never feels slow. */
+export const FADE_MS = 400;
+
 /** Everything needed to draw the projected screen; pushed whole from the control window. */
 export interface PresentationState {
   blank: boolean;
   theme: PresentTheme;
   slide: PresentSlide | null;
+  /** How the screen changes to the next thing shown. */
+  transition: Transition;
+  /** A picture to load ahead of time (the next slide's), so a fade to it can start at once. */
+  preload: string | null;
 }
 
-export const STANDBY_STATE: PresentationState = { blank: false, theme: "dark", slide: null };
+export const STANDBY_STATE: PresentationState = { blank: false, theme: "dark", slide: null, transition: "fade", preload: null };
+
+/**
+ * What the screen looks like, as a string: two states with the same key look identical, so going
+ * from one to the other needs no transition (e.g. only `preload` changed).
+ */
+export function screenKey(state: PresentationState): string {
+  if (state.blank) return "blank";
+  const s = state.slide;
+  if (!s) return `standby:${state.theme}`;
+  if (s.kind === "image") return `image:${s.src}`;
+  return `verse:${state.theme}:${s.reference}:${s.label ?? ""}:${s.text}`;
+}

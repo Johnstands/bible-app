@@ -602,7 +602,15 @@ function App() {
   const setCurrentIndex = adHoc ? setAdHocIndex : setQueueIndex;
   const presenting = liveStatus.open;
 
-  const presentState: PresentationState = { blank, theme: presentPrefs.theme, slide: currentSlide };
+  const nextSlide = currentSlides[currentIndex + 1];
+  const presentState: PresentationState = {
+    blank,
+    theme: presentPrefs.theme,
+    slide: currentSlide,
+    transition: presentPrefs.transition,
+    // The next picture loads while this slide is up, so stepping to it can fade at once.
+    preload: nextSlide?.kind === "image" ? nextSlide.src : null,
+  };
   const presentStateRef = useRef(presentState);
   presentStateRef.current = presentState;
 
@@ -657,6 +665,11 @@ function App() {
   };
   const setPresentTheme = (theme: typeof presentPrefs.theme) => {
     const next = { ...presentPrefs, theme };
+    setPresentPrefs(next);
+    savePresentationPrefs(next);
+  };
+  const setTransition = (transition: typeof presentPrefs.transition) => {
+    const next = { ...presentPrefs, transition };
     setPresentPrefs(next);
     savePresentationPrefs(next);
   };
@@ -1073,6 +1086,8 @@ function App() {
             onGranularity={setGranularity}
             theme={presentPrefs.theme}
             onTheme={setPresentTheme}
+            transition={presentPrefs.transition}
+            onTransition={setTransition}
             status={liveStatus}
             onStop={stopPresenting}
             onRedetect={redetectDisplay}

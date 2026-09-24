@@ -60,7 +60,7 @@ describe("slides in a playlist", () => {
     await showing(app, "John 3:17 · 2 of 5");
     await next.click();
     await showing(app, `${deckName} · 1 of 3`);
-    const picture = dock(app).locator(".pres-preview-frame .present-image");
+    const picture = dock(app).locator(".pres-preview-frame .present-layer[data-current] .present-image");
     expect(await picture.getAttribute("src")).toMatch(/\/slides\/1%2F1$/);
     expect(await picture.getAttribute("alt")).toBe(`${deckName}, slide 1 of 3`);
     await next.click();
@@ -147,7 +147,7 @@ describe("slides in a playlist", () => {
     await showing(app, "Sunday.pdf · 1 of 3");
     // The page really was drawn by pdf.js: a 960×540pt page fills 1920×1080 exactly.
     const size = await app.page.waitForFunction(() => {
-      const img = document.querySelector<HTMLImageElement>(".pres-preview-frame .present-image");
+      const img = document.querySelector<HTMLImageElement>(".pres-preview-frame .present-layer[data-current] .present-image");
       return img?.complete && img.naturalWidth > 0 ? [img.naturalWidth, img.naturalHeight] : null;
     });
     expect(await size.jsonValue()).toEqual([1920, 1080]);

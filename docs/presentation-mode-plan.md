@@ -164,3 +164,27 @@ React props, not the event bridge, so it's still fully exercised by `npm run tes
   manager) flips the dock's status correctly and resets any ad-hoc slide.
 - Unplug the external monitor mid-session and press "Redetect display" to confirm it falls back
   gracefully.
+
+## Transitions between slides (2026-09-25)
+
+A **Fade / Cut** toggle in the dock's Live section (next to Dark/Light), saved with the other
+presentation prefs (`transition`, default `"fade"`). Fade is a 0.4 s crossfade (`FADE_MS` in
+`presentation.ts`).
+
+- `PresentationView` stacks one **layer** per screen. A new one fades in over the last; both have
+  solid backgrounds, so it's a true dissolve. Once it's fully in, the layers beneath are dropped, so
+  rapid clicks stack briefly and end on the latest: fades never queue. Cut replaces all layers at
+  once. Only the top layer is `data-current`, and the rest are `aria-hidden`.
+- `screenKey(state)` decides whether the screen actually changed. Only a change of look fades, so
+  a new `preload`, the transition setting itself, or Dark/Light while blanked doesn't. Blank and
+  Unblank fade (to and from black).
+- A picture is decoded before its fade starts (`whenDecoded`, capped at 1.5 s and the last 8
+  pictures). The next slide's picture travels in the state as `preload` and is decoded ahead, in
+  both the dock preview and the projection window.
+- The fade deliberately **ignores reduced motion**: that setting is the operator's, and this is what
+  the congregation sees. (The app's reduced-motion rule only shortens its `--dur-*` variables, which
+  the fade doesn't use.)
+- Tests: `screenKey` and prefs unit tests; `tests/ui/fade.e2e.ts` watches the preview's layers
+  (fade shows 2 then 1, Cut never 2, Blank fades, rapid Next lands right, no fade when nothing
+  visible changes, the setting persists). The harness runs with reduced motion on, so these also
+  cover that. Tests that read the projected picture/text must use the `[data-current]` layer.
