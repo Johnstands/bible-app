@@ -18,7 +18,22 @@ Status: **plan only, nothing built yet.** Branch: `slides-import`.
 5. While presenting, the dock's live preview and the projection window show the slide image,
    letterboxed on black to fit the screen. The Dark/Light and verse/whole toggles don't affect
    image slides.
-6. If the source file changed, a **Re-import** action on the item re-runs the conversion from the
+6. **Switching freely between verses and slides while live**, not just stepping in order:
+   - **Click any playlist item** in the dock to put it on screen at once: a passage goes to its
+     first verse, a deck to its first slide. Today the dock's item list isn't clickable, and the
+     only way to move is Next/Previous.
+   - **Deck items expand** into a strip of slide thumbnails. Click any thumbnail to jump straight to
+     that slide (e.g. back to the chorus slide).
+   - **The item on screen is highlighted** in the list, so it's always clear where Next goes.
+   - **An unplanned verse mid-slides:** select verses in the reader → **Present now**. The app
+     already remembers the playlist position while showing an ad-hoc passage (`adHoc` state is
+     separate from `queueIndex`), so **Return to the playlist** lands back on the exact slide that
+     was up. The button's wording follows what it returns to: "Back to Sunday.pptx, slide 7".
+   - Implementation: `buildQueueSlides` also returns, per playlist item, the index of its first
+     slide (`itemStarts: number[]`), so "jump to item *i*" is `setQueueIndex(itemStarts[i])` and
+     "which item is live" is a lookup the other way. Clicking an item while an ad-hoc passage is up
+     leaves ad-hoc mode, like Return does.
+7. If the source file changed, a **Re-import** action on the item re-runs the conversion from the
    original path (if it still exists). Otherwise the user picks the file again.
 
 What does **not** carry over: animations, transitions, embedded video/audio, speaker notes. Each
@@ -161,7 +176,8 @@ stepping Next across passage → slides → passage, and removing it.
 ## Build order (each step shippable/testable on its own)
 
 1. **Data + display, images only.** Migration 5, deck types end to end, `slides://` protocol, image
-   slides in the view/preview, PNG/JPG import. Proves the whole pipeline without any converter.
+   slides in the view/preview, PNG/JPG import, and **click-to-jump** (items, slide thumbnails,
+   live highlight, "Back to … slide N"). Proves the whole pipeline without any converter.
 2. **PDF import** via pdf.js.
 3. **LibreOffice** `.pptx`/`.odp` → PDF → step 2. *Fully testable on this Linux machine
    (LibreOffice is installed).*
@@ -195,7 +211,10 @@ path validation), `npm test` (slide building with mixed items, pdf render), `npm
 - Choosing a slide *range* from a deck, rather than the whole deck.
 - Google Slides import by link (would need the network; the app is otherwise fully offline).
 
-## Open questions for the user
+## Decisions
 
-- Should a deck always be the whole deck, or is picking a range needed from day one?
-- Should image slides use black letterboxing, or the current Dark/Light background color?
+- **Switching between verses and slides must be free, not only in order** (user, 2026-09-24).
+  Covered by item 6 of "What the user sees". Click-to-jump applies to passages too, so it's built
+  in step 1.
+- A deck is added whole for now (a range can be added later). Image slides are letterboxed on
+  black. These are defaults, not user decisions yet; easy to change.
