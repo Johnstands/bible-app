@@ -4,7 +4,8 @@ Adding slide decks (PowerPoint, Keynote, PDF, plain images) to a presentation-mo
 service can go *welcome slide → Psalm 100 → song lyrics → John 3:16 → announcements* and
 Next/Previous steps straight through all of it.
 
-Status: **step 1 of 4 built** (image slides + click-to-jump), on branch `slides-import`, not merged.
+Status: **steps 1–2 of 4 built** (image slides, click-to-jump, PDF import), on branch
+`slides-import`, not merged.
 See "Progress" at the end.
 
 ## What the user sees
@@ -258,4 +259,40 @@ own `user.db` from v4 to v5 with its playlist intact (backup at `user.db.bak-bef
 The UI tests use stand-ins for both. Next time the app is open: Present → a playlist → Add slides…
 → pick a few pictures → check they show in the dock and on the projection window.
 
-### Next: step 2 (PDF import via pdf.js)
+### Step 2 — done (2026-09-25)
+
+PDF import, as planned, with these specifics:
+
+- **pdf.js 6.3** (`pdfjs-dist`), **legacy build**, loaded with a dynamic `import()` only when a PDF is
+  imported, so it's a separate ~490 KB chunk plus a 1.3 MB worker, and the main bundle is unchanged.
+  The legacy build is for older WebKit (macOS's system webview can be old). **Don't downgrade
+  below 6.2.108:** 5.6–6.2 have GHSA-hq66-cqwq-w95j (a malicious PDF can run script). 5.x was tried
+  first and `npm audit` flagged it.
+- The flow, in `App.tsx`'s `addSlides`, with the rendering in the new `src/slideImport.ts`:
+  1. `read_slide_pdf(path)` returns the file raw (`tauri::ipc::Response`, not JSON). It only reads
+     `.pdf` files, up to 256 MB, since it's the one command that reads a user-named file.
+  2. pdf.js draws each page fitted into 1920×1080, via `canvas.toBlob` to a PNG.
+  3. `import_rendered_slides` gets one raw body, `encodeFrames([name, ...pngs])` (u32-LE
+     length-prefixed frames), with the playlist in an `x-playlist` header. Rust (`decks::split_frames`,
+     `import_rendered`) checks each page is a PNG and stores the deck through the same
+     all-or-nothing `create_deck` as pictures.
+- One pick can mix things: the pictures together become one deck, then each PDF its own, all in
+  filename order. The dock shows progress ("Drawing Sunday.pdf: page 3 of 12…").
+- Errors are readable: password-protected PDFs, files that aren't really PDFs, more than 500 pages
+  (`MAX_SLIDES`, shared by both import paths). Whatever was added before a failure is kept.
+- **Not bundled:** pdf.js's standard-font data, CMaps and the JPEG 2000 decoder wasm. PDFs exported
+  from PowerPoint, Keynote or Google Slides embed their fonts and images, so they don't need them. A
+  PDF relying on non-embedded standard fonts falls back to system fonts, and one with JPEG 2000
+  images may not show those images. Add them (copy the `pdfjs-dist` folders into the build and pass
+  `standardFontDataUrl`/`cMapUrl`/`wasmUrl`) if that ever turns up.
+
+**Verified:** `cargo test` 88 (5 new: frame splitting, rendered import, non-PNG/empty/bad-name
+refusals, size limit, `read_pdf` only reading PDFs); `npm test` 135 (`slideImport.test.ts`);
+`npm run test:ui` 121 (3 new PDF tests, using a generated 3-page PDF from
+`scripts/ui/test-pdf.mjs`; the harness now carries raw bytes both ways); production build.
+**Also run in real WebKitGTK 2.52** (the Linux app's engine, via its MiniBrowser): the same
+`renderPdfPages` drew all 3 pages at 1920×1080 with the right colors.
+
+**Not verified:** a PDF import inside the actual Tauri window, and anything on macOS/Windows.
+
+### Next: step 3 (LibreOffice .pptx/.odp → PDF → step 2)

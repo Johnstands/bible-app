@@ -31,7 +31,8 @@ interface Props {
   liveSlide: number;
   onJumpToItem: (i: number) => void;
   onJumpToSlide: (queueIndex: number) => void;
-  importing: boolean;
+  /** What an import in progress is doing, or null when none is. */
+  importStatus: string | null;
   onAddSlides: () => void;
   onNext: () => void;
   onPrev: () => void;
@@ -58,7 +59,7 @@ export function PresentationDock({
   playlists, activePlaylistId, onSelectPlaylist, onCreatePlaylist, onRenamePlaylist, onDeletePlaylist, onSaveItems,
   titleOf,
   presentState, slide, slideIndex, slideCount, usingAdHoc, returnLabel, onReturnToPlaylist,
-  itemSpans, liveItem, liveSlide, onJumpToItem, onJumpToSlide, importing, onAddSlides, onNext, onPrev,
+  itemSpans, liveItem, liveSlide, onJumpToItem, onJumpToSlide, importStatus, onAddSlides, onNext, onPrev,
   blank, onToggleBlank, granularity, onGranularity, theme, onTheme,
   status, onStop, onRedetect,
 }: Props) {
@@ -282,13 +283,16 @@ export function PresentationDock({
           {active && (
             <>
               <div className="pres-row">
-                <button onClick={onAddSlides} disabled={importing}>
-                  {importing ? "Adding slides…" : "Add slides…"}
+                <button onClick={onAddSlides} disabled={importStatus !== null}>
+                  Add slides…
                 </button>
+                <span className="pres-live-status" role="status">
+                  {importStatus}
+                </span>
               </div>
               <p className="pres-hint">
-                Pictures (PNG or JPG). Choose several at once to add them as one set, in filename order. Export a PowerPoint as
-                pictures first; animations and videos don’t carry over.
+                A PDF, or pictures (PNG or JPG). Pictures chosen together become one set, in filename order. For PowerPoint or
+                Keynote, save the deck as a PDF first. Animations and videos don’t carry over.
               </p>
             </>
           )}

@@ -77,6 +77,8 @@ pub fn run() {
             commands::delete_playlist,
             commands::save_playlist_items,
             commands::import_slides,
+            commands::read_slide_pdf,
+            commands::import_rendered_slides,
             present::present_open,
             present::present_close,
             present::present_status,

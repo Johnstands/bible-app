@@ -235,6 +235,13 @@ export const savePlaylistItems = (id: number, items: NewPlaylistItem[]) => invok
 /** Adds image files (in the order given) to the end of a playlist as one deck of slides. */
 export const importSlides = (playlist: number, paths: string[]) => invoke<void>("import_slides", { playlist, paths });
 
+/** A PDF's bytes, for drawing its pages as slides (see slideImport.ts). */
+export const readSlidePdf = (path: string) => invoke<ArrayBuffer>("read_slide_pdf", { path });
+/** Adds a PDF's drawn pages to the end of a playlist as one deck. `body` is `encodeFrames([name, ...pngs])`
+ *  (see slideImport.ts), sent as raw bytes rather than JSON. */
+export const importRenderedSlides = (playlist: number, body: Uint8Array) =>
+  invoke<void>("import_rendered_slides", body, { headers: { "x-playlist": String(playlist) } });
+
 /** Image types a deck can be made from; must match `IMAGE_TYPES` in src-tauri/src/decks.rs. */
 export const SLIDE_IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "webp", "gif"];
 /** The URI scheme slide images are served from; must match `decks::SCHEME` in the Rust backend. */

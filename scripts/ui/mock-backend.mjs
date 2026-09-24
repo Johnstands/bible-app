@@ -6,6 +6,7 @@ import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { makePdf } from "./test-pdf.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "../..");
 const db = new DatabaseSync(path.join(ROOT, "src-tauri/resources/bible.db"), { readOnly: true });
@@ -37,14 +38,17 @@ export function createBackend({ update = null } = {}) {
   const playlists = new Map(); // id -> { id, name, updatedAt, items: [{id, kind: "passage", book, …} | {id, kind: "deck", deck, name, slideCount, label}] }
   let playlistsNextId = 1;
   let playlistItemNextId = 1;
-  const decks = new Map(); // id -> { name, slideCount }; their "images" are drawn by serve() below
+  const decks = new Map(); // id -> { name, slideCount, pngs? }; pictures without pngs are drawn by serve() below
   let decksNextId = 1;
   // What the next "Add slides…" file picker returns; a test can change it with mock:set_picker.
   let pickerPaths = ["/home/user/Pictures/Welcome.png", "/home/user/Pictures/Slide10.png", "/home/user/Pictures/Slide2.png"];
   /** A saved item as list_playlists returns it: deck items carry their deck's name and size. */
   const storedItem = (it) => {
     const item = { id: playlistItemNextId++, ...it };
-    if (it.kind === "deck") Object.assign(item, decks.get(it.deck));
+    if (it.kind === "deck") {
+      const { name, slideCount } = decks.get(it.deck);
+      Object.assign(item, { name, slideCount });
+    }
     return item;
   };
   /** Forgets decks no playlist uses any more, like the real backend. */
@@ -223,8 +227,32 @@ export function createBackend({ update = null } = {}) {
       s.items.push(storedItem({ kind: "deck", deck, label: null }));
       s.updatedAt = new Date().toISOString();
     },
+    // Any PDF path reads as a small three-page PDF, except one named "broken", which isn't a PDF at all.
+    read_slide_pdf: ({ path }) => {
+      if (!/\.pdf$/i.test(path)) throw new Error(`${path} isn't a PDF.`);
+      return { __bytes: (/broken/i.test(path) ? Buffer.from("this is not a pdf") : makePdf(3)).toString("base64") };
+    },
+    import_rendered_slides: (_args, { raw, headers }) => {
+      const s = playlists.get(Number(headers["x-playlist"]));
+      if (!s) throw new Error("That playlist no longer exists.");
+      const frames = [];
+      for (let at = 0; at < raw.length; ) {
+        const len = raw.readUInt32LE(at);
+        frames.push(raw.subarray(at + 4, at + 4 + len));
+        at += 4 + len;
+      }
+      const [name, ...pngs] = frames;
+      const signature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+      if (pngs.length === 0 || !pngs.every((p) => p.subarray(0, 8).equals(signature))) throw new Error("A rendered page isn't a PNG image.");
+      const deck = decksNextId++;
+      decks.set(deck, { name: name.toString("utf8"), slideCount: pngs.length, pngs: pngs.map((p) => Buffer.from(p)) });
+      s.items.push(storedItem({ kind: "deck", deck, label: null }));
+      s.updatedAt = new Date().toISOString();
+    },
     "plugin:dialog|open": () => pickerPaths,
     "mock:set_picker": ({ paths }) => { pickerPaths = paths; },
+    /** Not a command: the stored PNG for a PDF deck's slide `n` (1-based), for serve(). */
+    __deckPng: (deck, n) => decks.get(deck)?.pngs?.[n - 1],
     // No real second window exists in a headless browser; the dock's own live preview (driven by
     // React state, not this bridge) is what actually gets exercised by the UI tests for this feature.
     present_open: () => ({ open: (presentIsOpen = true), monitorLabel: null }),
@@ -242,6 +270,8 @@ export function serve(port = 9100, options = {}) {
     if (req.method === "OPTIONS") return res.writeHead(204, cors).end();
     // Stands in for the app's slides:// scheme (see harness.mjs's convertFileSrc): a numbered placeholder slide.
     const slide = req.method === "GET" && /^\/slides\/(\d+)%2F(\d+)$/.exec(req.url ?? "");
+    const rendered = slide && commands.__deckPng(Number(slide[1]), Number(slide[2]));
+    if (rendered) return res.writeHead(200, { ...cors, "content-type": "image/png" }).end(rendered);
     if (slide) {
       const [, deck, n] = slide;
       const hue = (Number(deck) * 67) % 360;
@@ -256,10 +286,10 @@ export function serve(port = 9100, options = {}) {
     req.on("data", (c) => (body += c));
     req.on("end", () => {
       try {
-        const { cmd, args } = JSON.parse(body);
+        const { cmd, args, raw, headers } = JSON.parse(body);
         if (!commands[cmd]) throw new Error(`unknown command ${cmd}`);
         // Run the command before writing anything, so one that throws can still answer with its error.
-        const ok = commands[cmd](args ?? {}) ?? null;
+        const ok = commands[cmd](args ?? {}, { raw: raw === undefined ? undefined : Buffer.from(raw, "base64"), headers: headers ?? {} }) ?? null;
         res.writeHead(200, { ...cors, "content-type": "application/json" }).end(JSON.stringify({ ok }));
       } catch (e) {
         res.writeHead(200, { ...cors, "content-type": "application/json" }).end(JSON.stringify({ err: String(e.message ?? e) }));

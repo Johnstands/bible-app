@@ -5,9 +5,10 @@ import "./App.css";
 import {
   createPlaylist, deletePlaylist, EMPTY_MARKS, getChapter, getMarks, getPlans, getWordTags, HIGHLIGHT_COLORS, importSlides,
   listBooks, listChapters, listPlaylists, presentClose, presentOpen, presentStatus as fetchPresentStatus, renamePlaylist, saveNote,
-  savePlaylistItems, setHighlight, setPlanDay, SLIDE_IMAGE_EXTENSIONS, slideSrc, startPlan, stopPlan, toggleBookmark,
-  toNewPlaylistItem,
+  importRenderedSlides, readSlidePdf, savePlaylistItems, setHighlight, setPlanDay, SLIDE_IMAGE_EXTENSIONS, slideSrc,
+  startPlan, stopPlan, toggleBookmark, toNewPlaylistItem,
 } from "./api";
+import { baseName, encodeFrames, isPdf, renderPdfPages } from "./slideImport";
 import type { Book, ChapterMarks, HighlightColor, NewPlaylistItem, PresentStatus, Playlist, StartedPlan, Verse, WordTag } from "./api";
 import { buildQueue, buildSlides, itemAt, PRESENTATION_WINDOW, slideCaption } from "./presentation";
 import type { Passage, PresentationState, PresentSlide, Queue, QueueEntry } from "./presentation";
@@ -145,7 +146,8 @@ function App() {
   const [adHocIndex, setAdHocIndex] = useState(0);
   const [presentPrefs, setPresentPrefs] = useState(loadPresentationPrefs);
   const [blank, setBlank] = useState(false);
-  const [importing, setImporting] = useState(false);
+  /** What an import of slides is doing right now ("Drawing Sunday.pdf: page 3 of 12…"), or null. */
+  const [importStatus, setImportStatus] = useState<string | null>(null);
   const [liveStatus, setLiveStatus] = useState<PresentStatus>({ open: false, monitorLabel: null });
   const [copied, setCopied] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -683,29 +685,45 @@ function App() {
   /** The playlist item on screen right now, or -1 (nothing, or an ad-hoc passage). */
   const liveItem = adHoc ? -1 : itemAt(queue.items, queueIndex);
 
-  /** Asks for image files and adds them to the end of the active playlist as one deck. */
+  /**
+   * Asks for pictures and/or PDFs and adds them to the end of the active playlist: the pictures
+   * together as one deck, then each PDF as its own deck, its pages drawn here with pdf.js.
+   */
   const addSlides = async () => {
-    if (!activePlaylist || importing) return;
+    if (!activePlaylist || importStatus !== null) return;
+    const playlist = activePlaylist.id;
     const picked = await openFileDialog({
       multiple: true,
       title: "Add slides",
-      filters: [{ name: "Images", extensions: SLIDE_IMAGE_EXTENSIONS }],
+      filters: [{ name: "Pictures or PDF", extensions: [...SLIDE_IMAGE_EXTENSIONS, "pdf"] }],
     }).catch((e) => {
       setNotice(`Couldn’t open the file picker: ${e}`);
       return null;
     });
     if (!picked || picked.length === 0) return;
-    setImporting(true);
+    // Slides go in filename order ("Slide1.png", "Slide2.png", … "Slide10.png"), whatever order the picker returned.
+    const byName = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+    const sorted = [...picked].sort((a, b) => byName.compare(baseName(a), baseName(b)));
+    const pictures = sorted.filter((p) => !isPdf(p));
+    const pdfs = sorted.filter(isPdf);
+    setImportStatus("Adding slides…");
     try {
-      // Slides go in filename order ("Slide1.png", "Slide2.png", … "Slide10.png"), whatever order the picker returned.
-      const byName = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
-      const baseName = (path: string) => path.split(/[\\/]/).pop() ?? path;
-      await importSlides(activePlaylist.id, [...picked].sort((a, b) => byName.compare(baseName(a), baseName(b))));
-      await refreshPlaylists();
+      if (pictures.length > 0) await importSlides(playlist, pictures);
+      for (const path of pdfs) {
+        const name = baseName(path);
+        setImportStatus(`Opening ${name}…`);
+        const pages = await renderPdfPages(await readSlidePdf(path), name, (done, total) =>
+          setImportStatus(`Drawing ${name}: page ${done} of ${total}…`),
+        );
+        setImportStatus(`Saving ${name}…`);
+        await importRenderedSlides(playlist, encodeFrames([new TextEncoder().encode(name), ...pages]));
+      }
     } catch (e) {
-      setNotice(`Couldn’t add those slides: ${e}`);
+      setNotice(`Couldn’t add those slides: ${e instanceof Error ? e.message : e}`);
     } finally {
-      setImporting(false);
+      setImportStatus(null);
+      // Whatever got added before a failure is kept, so show it.
+      await refreshPlaylists();
     }
   };
 
@@ -1029,7 +1047,7 @@ function App() {
             liveSlide={adHoc ? -1 : queueIndex}
             onJumpToItem={jumpToItem}
             onJumpToSlide={jumpToSlide}
-            importing={importing}
+            importStatus={importStatus}
             onAddSlides={() => void addSlides()}
             onNext={goNext}
             onPrev={goPrev}

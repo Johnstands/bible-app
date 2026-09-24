@@ -205,6 +205,30 @@ pub async fn import_slides(app: AppHandle, state: State<'_, AppState>, playlist:
     Ok(())
 }
 
+/// A PDF's bytes (sent raw, not as JSON), for the webview to render its pages with pdf.js.
+#[tauri::command]
+pub async fn read_slide_pdf(path: PathBuf) -> Result<tauri::ipc::Response> {
+    Ok(tauri::ipc::Response::new(decks::read_pdf(&path)?))
+}
+
+/// Adds a PDF's pages, rendered to PNGs by the webview, to the end of a playlist as one deck. The
+/// body is raw bytes (see `decks::import_rendered`); the playlist id comes in an `x-playlist` header.
+#[tauri::command]
+pub async fn import_rendered_slides(app: AppHandle, state: State<'_, AppState>, request: tauri::ipc::Request<'_>) -> Result<()> {
+    let tauri::ipc::InvokeBody::Raw(body) = request.body() else {
+        return Err(db::Error::Invalid("Expected the rendered slides as raw bytes.".into()));
+    };
+    let playlist = request
+        .headers()
+        .get("x-playlist")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.parse::<i64>().ok())
+        .ok_or_else(|| db::Error::Invalid("Which playlist to add the slides to is missing.".into()))?;
+    let root = decks_root(&app)?;
+    decks::import_rendered(&state.user.lock().unwrap(), &root, playlist, body)?;
+    Ok(())
+}
+
 #[tauri::command]
 pub fn get_library(state: State<AppState>) -> Result<Library> {
     // Always lock the Bible DB before the user DB so two commands can't deadlock.

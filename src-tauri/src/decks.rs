@@ -6,6 +6,8 @@
 //! ```
 //!
 //! The files are the app's own copies, so moving or deleting the original doesn't break a playlist.
+//! A deck comes either from image files (copied as they are) or from a PDF, whose pages the webview
+//! renders to PNGs with pdf.js and sends back in one body (see `split_frames`).
 //! Both webviews (the control window and the projection window) load them through the `slides://`
 //! URI scheme registered in lib.rs, which only ever serves files from inside this folder.
 
@@ -55,33 +57,48 @@ fn deck_name(paths: &[PathBuf]) -> String {
     }
 }
 
-/// Imports `paths` (images, in slide order) as a new deck appended to the end of `playlist`, and
-/// returns the new deck's id. All or nothing: on any failure no deck row, item or files are left.
-pub fn import_images(conn: &Connection, root: &Path, playlist: i64, paths: &[PathBuf]) -> Result<i64> {
-    if paths.is_empty() {
-        return Err(Error::Invalid("No images were chosen.".into()));
-    }
-    let exts = paths
-        .iter()
-        .map(|p| image_ext(p).ok_or_else(|| Error::Invalid(format!("{} isn't a supported image (PNG, JPG, WebP or GIF).", p.display()))))
-        .collect::<Result<Vec<_>>>()?;
+/// The most slides one deck may have: far more than any service needs, but a stop for a runaway PDF.
+pub const MAX_SLIDES: usize = 500;
 
+/// The largest PDF read for rendering (bytes).
+const MAX_PDF_BYTES: u64 = 256 * 1024 * 1024;
+
+const PNG_SIGNATURE: &[u8] = b"\x89PNG\r\n\x1a\n";
+
+/// Where one slide of a new deck comes from.
+enum Slide<'a> {
+    /// An image file, copied as is, with its (lowercased, accepted) extension.
+    File(&'a Path, String),
+    /// A PNG rendered by the webview.
+    Png(&'a [u8]),
+}
+
+/// Stores `slides` as a new deck named `name` appended to the end of `playlist`, and returns its id.
+/// All or nothing: on any failure no deck row, item or files are left.
+fn create_deck(conn: &Connection, root: &Path, playlist: i64, name: &str, slides: &[Slide]) -> Result<i64> {
+    if slides.len() > MAX_SLIDES {
+        return Err(Error::Invalid(format!("That's {} slides; a set can have at most {MAX_SLIDES}.", slides.len())));
+    }
     let tx = conn.unchecked_transaction()?;
-    tx.execute("INSERT INTO decks (name, slide_count) VALUES (?1, ?2)", params![deck_name(paths), paths.len() as u32])?;
+    tx.execute("INSERT INTO decks (name, slide_count) VALUES (?1, ?2)", params![name, slides.len() as u32])?;
     let deck = tx.last_insert_rowid();
     let dir = root.join(deck.to_string());
-    let copied = (|| -> Result<()> {
+    let stored = (|| -> Result<()> {
         // A folder left behind by a deck whose id SQLite has since reused must not leak old slides in.
         if dir.exists() {
             std::fs::remove_dir_all(&dir)?;
         }
         std::fs::create_dir_all(&dir)?;
-        for (i, (src, ext)) in paths.iter().zip(&exts).enumerate() {
-            std::fs::copy(src, dir.join(format!("{}.{ext}", stem(i as u32 + 1))))?;
+        for (i, slide) in slides.iter().enumerate() {
+            let stem = stem(i as u32 + 1);
+            match slide {
+                Slide::File(src, ext) => std::fs::copy(src, dir.join(format!("{stem}.{ext}"))).map(|_| ())?,
+                Slide::Png(bytes) => std::fs::write(dir.join(format!("{stem}.png")), bytes)?,
+            }
         }
         playlists::append_deck(&tx, playlist, deck)
     })();
-    match copied {
+    match stored {
         Ok(()) => {
             tx.commit()?;
             Ok(deck)
@@ -91,6 +108,72 @@ pub fn import_images(conn: &Connection, root: &Path, playlist: i64, paths: &[Pat
             Err(e)
         }
     }
+}
+
+/// Imports `paths` (images, in slide order) as a new deck appended to the end of `playlist`, and
+/// returns the new deck's id.
+pub fn import_images(conn: &Connection, root: &Path, playlist: i64, paths: &[PathBuf]) -> Result<i64> {
+    if paths.is_empty() {
+        return Err(Error::Invalid("No images were chosen.".into()));
+    }
+    let slides = paths
+        .iter()
+        .map(|p| {
+            image_ext(p)
+                .map(|ext| Slide::File(p, ext))
+                .ok_or_else(|| Error::Invalid(format!("{} isn't a supported image (PNG, JPG, WebP or GIF).", p.display())))
+        })
+        .collect::<Result<Vec<_>>>()?;
+    create_deck(conn, root, playlist, &deck_name(paths), &slides)
+}
+
+/// Splits a body of length-prefixed frames (each a little-endian u32 byte count, then that many
+/// bytes) back into its frames. Anything malformed — a truncated length or frame — is refused.
+pub fn split_frames(mut body: &[u8]) -> Result<Vec<&[u8]>> {
+    let bad = || Error::Invalid("The rendered slides arrived damaged.".into());
+    let mut frames = Vec::new();
+    while !body.is_empty() {
+        let (len, rest) = body.split_first_chunk::<4>().ok_or_else(bad)?;
+        let len = u32::from_le_bytes(*len) as usize;
+        if rest.len() < len {
+            return Err(bad());
+        }
+        let (frame, rest) = rest.split_at(len);
+        frames.push(frame);
+        body = rest;
+    }
+    Ok(frames)
+}
+
+/// Imports a PDF's pages, rendered to PNGs by the webview, as a new deck at the end of `playlist`.
+/// `body` is frames (see `split_frames`): the deck's name as UTF-8, then one PNG per page.
+pub fn import_rendered(conn: &Connection, root: &Path, playlist: i64, body: &[u8]) -> Result<i64> {
+    let frames = split_frames(body)?;
+    let Some((name, pages)) = frames.split_first() else {
+        return Err(Error::Invalid("The rendered slides arrived damaged.".into()));
+    };
+    let name = std::str::from_utf8(name).map_err(|_| Error::Invalid("The slides' name isn't valid text.".into()))?.trim();
+    if pages.is_empty() {
+        return Err(Error::Invalid("That PDF has no pages.".into()));
+    }
+    if !pages.iter().all(|p| p.starts_with(PNG_SIGNATURE)) {
+        return Err(Error::Invalid("A rendered page isn't a PNG image.".into()));
+    }
+    let slides: Vec<Slide> = pages.iter().map(|p| Slide::Png(p)).collect();
+    create_deck(conn, root, playlist, if name.is_empty() { "Slides" } else { name }, &slides)
+}
+
+/// A PDF's bytes, for the webview to render. Only `.pdf` files, and only up to a sane size, since
+/// this is the one command that reads a file the user named.
+pub fn read_pdf(path: &Path) -> Result<Vec<u8>> {
+    let is_pdf = path.extension().and_then(|e| e.to_str()).is_some_and(|e| e.eq_ignore_ascii_case("pdf"));
+    if !is_pdf {
+        return Err(Error::Invalid(format!("{} isn't a PDF.", path.display())));
+    }
+    if std::fs::metadata(path)?.len() > MAX_PDF_BYTES {
+        return Err(Error::Invalid(format!("{} is too large (over {} MB).", path.display(), MAX_PDF_BYTES / 1024 / 1024)));
+    }
+    Ok(std::fs::read(path)?)
 }
 
 /// Removes the image folders of decks that were deleted from the DB. Best effort: a folder that
@@ -239,6 +322,72 @@ mod tests {
         delete_files(&root, &[one]);
         assert_eq!(serve(Some(root.clone()), &format!("/{one}/1")).status(), StatusCode::NOT_FOUND);
         assert_eq!(serve(Some(root.clone()), &format!("/{two}/1")).status(), StatusCode::OK);
+    }
+
+    /// Frames `parts` the way src/slideImport.ts's `encodeFrames` does.
+    fn frames(parts: &[&[u8]]) -> Vec<u8> {
+        parts.iter().flat_map(|p| (p.len() as u32).to_le_bytes().into_iter().chain(p.iter().copied())).collect()
+    }
+
+    fn png(tag: &[u8]) -> Vec<u8> {
+        [PNG_SIGNATURE, tag].concat()
+    }
+
+    #[test]
+    fn splits_frames_and_refuses_damaged_bodies() {
+        let body = frames(&[b"name", b"", b"page"]);
+        assert_eq!(split_frames(&body).unwrap(), [b"name".as_slice(), b"", b"page"]);
+        assert!(split_frames(&[]).unwrap().is_empty());
+        assert!(split_frames(&body[..body.len() - 1]).is_err(), "truncated frame");
+        assert!(split_frames(&[1, 0]).is_err(), "truncated length");
+        assert!(split_frames(&[255, 255, 255, 255, 1]).is_err(), "length past the end");
+    }
+
+    #[test]
+    fn imports_rendered_pdf_pages_as_pngs() {
+        let tmp = TempDir::new("rendered");
+        let root = tmp.0.join("decks");
+        let (c, playlist) = conn_with_playlist();
+        let (one, two) = (png(b"one"), png(b"two"));
+        let deck = import_rendered(&c, &root, playlist, &frames(&[" Sunday.pdf ".as_bytes(), &one, &two])).unwrap();
+
+        assert!(matches!(&list_playlists(&c).unwrap()[0].items[..], [PlaylistItem::Deck { name, slide_count: 2, .. }] if name == "Sunday.pdf"));
+        let second = serve(Some(root.clone()), &format!("/{deck}/2"));
+        assert_eq!(second.body(), &two);
+        assert_eq!(second.headers()[header::CONTENT_TYPE], "image/png");
+    }
+
+    #[test]
+    fn refuses_rendered_pages_that_are_not_pngs_or_missing() {
+        let tmp = TempDir::new("rendered-bad");
+        let root = tmp.0.join("decks");
+        let (c, playlist) = conn_with_playlist();
+        assert!(import_rendered(&c, &root, playlist, &frames(&[b"x.pdf"])).is_err(), "no pages");
+        assert!(import_rendered(&c, &root, playlist, &frames(&[b"x.pdf", &png(b"ok"), b"<html>"])).is_err(), "not a PNG");
+        assert!(import_rendered(&c, &root, playlist, &[]).is_err(), "empty body");
+        assert!(import_rendered(&c, &root, playlist, &frames(&[&[0xff, 0xfe], &png(b"ok")])).is_err(), "name not UTF-8");
+        let decks: i64 = c.query_row("SELECT COUNT(*) FROM decks", [], |r| r.get(0)).unwrap();
+        assert_eq!(decks, 0);
+    }
+
+    #[test]
+    fn a_deck_has_a_size_limit() {
+        let tmp = TempDir::new("limit");
+        let (c, playlist) = conn_with_playlist();
+        let page = png(b"p");
+        let mut parts: Vec<&[u8]> = vec![b"big.pdf"];
+        parts.extend(std::iter::repeat_n(page.as_slice(), MAX_SLIDES + 1));
+        assert!(import_rendered(&c, &tmp.0.join("decks"), playlist, &frames(&parts)).is_err());
+    }
+
+    #[test]
+    fn reads_only_pdfs() {
+        let tmp = TempDir::new("read-pdf");
+        let pdf = tmp.write("Sunday.PDF", b"%PDF-1.4 ...");
+        assert_eq!(read_pdf(&pdf).unwrap(), b"%PDF-1.4 ...");
+        let other = tmp.write("secrets.txt", b"no");
+        assert!(read_pdf(&other).is_err());
+        assert!(read_pdf(&tmp.0.join("missing.pdf")).is_err());
     }
 
     #[test]

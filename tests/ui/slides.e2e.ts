@@ -18,6 +18,15 @@ async function showing(a: App, text: string) {
   );
 }
 
+/** Sets what the next "Add slides…" file picker returns. */
+async function pick(a: App, paths: string[]) {
+  await a.page.evaluate(
+    // @ts-expect-error the harness's stand-in for Tauri's bridge
+    (p) => window.__TAURI_INTERNALS__.invoke("mock:set_picker", { paths: p }),
+    paths,
+  );
+}
+
 /** Presenting, with a "Sunday" playlist of John 3:16–17 followed by a three-picture deck. */
 async function withPassageAndDeck() {
   app = await startApp();
@@ -119,14 +128,51 @@ describe("slides in a playlist", () => {
 
   it("says why a file that isn't a picture can't be added", async () => {
     await withPassageAndDeck();
-    await app.page.evaluate(() =>
-      // @ts-expect-error the harness's stand-in for Tauri's bridge
-      window.__TAURI_INTERNALS__.invoke("mock:set_picker", { paths: ["/home/user/Sunday.pptx"] }),
-    );
+    await pick(app, ["/home/user/Sunday.pptx"]);
     await app.page.getByRole("button", { name: "Add slides…" }).click();
     await app.page.waitForSelector(".toast");
     expect(await app.page.locator(".toast").textContent()).toMatch(/Couldn’t add those slides: .*Sunday\.pptx isn't a supported image/);
     expect(await items(app).count()).toBe(2);
+  });
+
+  it("draws each page of a PDF as its own slide, sized for a 1080p screen", async () => {
+    await withPassageAndDeck();
+    await pick(app, ["/home/user/Sunday.pdf"]);
+    await app.page.getByRole("button", { name: "Add slides…" }).click();
+    await app.page.waitForFunction(() => document.querySelectorAll(".pres-dock .pres-item").length === 3);
+    expect(await itemRefs(app)).toEqual(["John 3:16–17", deckName, "Sunday.pdf"]);
+    expect(await items(app).nth(2).locator(".pres-item-count").textContent()).toBe("3 slides");
+
+    await items(app).nth(2).locator(".pres-item-go").click();
+    await showing(app, "Sunday.pdf · 1 of 3");
+    // The page really was drawn by pdf.js: a 960×540pt page fills 1920×1080 exactly.
+    const size = await app.page.waitForFunction(() => {
+      const img = document.querySelector<HTMLImageElement>(".pres-preview-frame .present-image");
+      return img?.complete && img.naturalWidth > 0 ? [img.naturalWidth, img.naturalHeight] : null;
+    });
+    expect(await size.jsonValue()).toEqual([1920, 1080]);
+    await dock(app).getByRole("button", { name: "Next ▶" }).click();
+    await showing(app, "Sunday.pdf · 2 of 3");
+    // The progress line is cleared once it's done.
+    expect(await dock(app).locator(".pres-section[aria-label=Playlist] [role=status]").textContent()).toBe("");
+  });
+
+  it("adds pictures together as one set and each PDF as its own, in filename order", async () => {
+    await withPassageAndDeck();
+    await pick(app, ["/home/user/b-sermon.pdf", "/home/user/a-welcome.png", "/home/user/c-songs.pdf"]);
+    await app.page.getByRole("button", { name: "Add slides…" }).click();
+    await app.page.waitForFunction(() => document.querySelectorAll(".pres-dock .pres-item").length === 5);
+    expect(await itemRefs(app)).toEqual(["John 3:16–17", deckName, "a-welcome.png", "b-sermon.pdf", "c-songs.pdf"]);
+  });
+
+  it("says so when a .pdf file isn't really a PDF, and adds nothing", async () => {
+    await withPassageAndDeck();
+    await pick(app, ["/home/user/broken.pdf"]);
+    await app.page.getByRole("button", { name: "Add slides…" }).click();
+    await app.page.waitForSelector(".toast");
+    expect(await app.page.locator(".toast").textContent()).toMatch(/^Couldn’t add those slides: broken\.pdf couldn’t be opened as a PDF/);
+    expect(await items(app).count()).toBe(2);
+    expect(await app.page.getByRole("button", { name: "Add slides…" }).isEnabled()).toBe(true);
   });
 
   it("offers no Add slides button until a playlist is chosen", async () => {

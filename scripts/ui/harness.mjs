@@ -17,10 +17,21 @@ const bridge = `
     transformCallback: () => 0,
     // Custom URI schemes (the app's slides://) are served by the mock backend instead.
     convertFileSrc: (path, protocol) => "http://127.0.0.1:9100/" + protocol + "/" + encodeURIComponent(path),
-    invoke: async (cmd, args) => {
-      const res = await fetch("http://127.0.0.1:9100/invoke", { method: "POST", body: JSON.stringify({ cmd, args }) });
+    // Raw bytes (Tauri's non-JSON invoke body and ipc::Response) travel as base64 in both directions.
+    invoke: async (cmd, args, options) => {
+      const toBase64 = (bytes) => {
+        let s = "";
+        for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+        return btoa(s);
+      };
+      const raw = args instanceof ArrayBuffer || ArrayBuffer.isView(args);
+      const body = raw
+        ? { cmd, raw: toBase64(new Uint8Array(args.buffer ?? args, args.byteOffset ?? 0, args.byteLength)), headers: options?.headers ?? {} }
+        : { cmd, args };
+      const res = await fetch("http://127.0.0.1:9100/invoke", { method: "POST", body: JSON.stringify(body) });
       const out = await res.json();
       if (out.err) throw out.err;
+      if (out.ok && typeof out.ok.__bytes === "string") return Uint8Array.from(atob(out.ok.__bytes), (c) => c.charCodeAt(0)).buffer;
       return out.ok;
     },
   };
