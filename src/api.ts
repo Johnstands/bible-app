@@ -181,8 +181,8 @@ export interface Library {
   highlights: LibraryEntry[];
 }
 
-/** One passage in a saved presentation-mode service. */
-export interface ServiceItem {
+/** One passage in a saved presentation-mode playlist. */
+export interface PlaylistItem {
   id: number;
   book: number;
   chapter: number;
@@ -193,15 +193,15 @@ export interface ServiceItem {
 }
 
 /** A saved, reusable list of passages a presenter builds ahead of a church service. */
-export interface Service {
+export interface Playlist {
   id: number;
   name: string;
   updatedAt: string;
-  items: ServiceItem[];
+  items: PlaylistItem[];
 }
 
-/** An item to save into a service's list, in the order given. */
-export interface NewServiceItem {
+/** An item to save into a playlist, in the order given. */
+export interface NewPlaylistItem {
   book: number;
   chapter: number;
   verse: number;
@@ -209,8 +209,8 @@ export interface NewServiceItem {
   label: string | null;
 }
 
-/** Drops the id, keeping the rest, for re-saving a service's own items back (e.g. after reordering). */
-export const toNewServiceItem = (i: ServiceItem): NewServiceItem => ({
+/** Drops the id, keeping the rest, for re-saving a playlist's own items back (e.g. after reordering). */
+export const toNewPlaylistItem = (i: PlaylistItem): NewPlaylistItem => ({
   book: i.book,
   chapter: i.chapter,
   verse: i.verse,
@@ -218,12 +218,12 @@ export const toNewServiceItem = (i: ServiceItem): NewServiceItem => ({
   label: i.label,
 });
 
-export const listServices = () => invoke<Service[]>("list_services");
-export const createService = (name: string) => invoke<number>("create_service", { name });
-export const renameService = (id: number, name: string) => invoke<void>("rename_service", { id, name });
-export const deleteService = (id: number) => invoke<void>("delete_service", { id });
-/** Replaces a service's items with `items`, in order. */
-export const saveServiceItems = (id: number, items: NewServiceItem[]) => invoke<void>("save_service_items", { id, items });
+export const listPlaylists = () => invoke<Playlist[]>("list_playlists");
+export const createPlaylist = (name: string) => invoke<number>("create_playlist", { name });
+export const renamePlaylist = (id: number, name: string) => invoke<void>("rename_playlist", { id, name });
+export const deletePlaylist = (id: number) => invoke<void>("delete_playlist", { id });
+/** Replaces a playlist's items with `items`, in order. */
+export const savePlaylistItems = (id: number, items: NewPlaylistItem[]) => invoke<void>("save_playlist_items", { id, items });
 
 /** Where the dedicated presentation window is right now. */
 export interface PresentStatus {

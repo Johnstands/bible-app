@@ -4,7 +4,7 @@ mod crossrefs;
 mod db;
 mod plans;
 mod present;
-mod services;
+mod playlists;
 mod strongs;
 mod syslibs;
 mod user;
@@ -63,11 +63,11 @@ pub fn run() {
             commands::delete_note,
             commands::toggle_bookmark,
             commands::get_library,
-            commands::list_services,
-            commands::create_service,
-            commands::rename_service,
-            commands::delete_service,
-            commands::save_service_items,
+            commands::list_playlists,
+            commands::create_playlist,
+            commands::rename_playlist,
+            commands::delete_playlist,
+            commands::save_playlist_items,
             present::present_open,
             present::present_close,
             present::present_status,

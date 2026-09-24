@@ -68,7 +68,7 @@ export function buildSlides(passage: Passage, granularity: Granularity): Present
 }
 
 /**
- * One flowing list of slides for a whole queued service: each passage's slides in order, so stepping
+ * One flowing list of slides for a whole queued playlist: each passage's slides in order, so stepping
  * past the end of one continues straight into the next — even across a chapter or book boundary.
  */
 export function buildQueueSlides(passages: Passage[], granularity: Granularity): PresentSlide[] {

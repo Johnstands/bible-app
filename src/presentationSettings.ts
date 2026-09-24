@@ -1,4 +1,4 @@
-// Presentation mode's own appearance preferences (not the saved services, which live in user.db —
+// Presentation mode's own appearance preferences (not the saved playlists, which live in user.db —
 // see api.ts). Small and throwaway, like userSettings.ts, so it follows the same shape.
 
 import { GRANULARITIES, PRESENT_THEMES_LIST } from "./presentation";

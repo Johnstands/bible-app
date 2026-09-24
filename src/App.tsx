@@ -2,11 +2,11 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { emitTo, listen } from "@tauri-apps/api/event";
 import "./App.css";
 import {
-  createService, deleteService, EMPTY_MARKS, getChapter, getMarks, getPlans, getWordTags, HIGHLIGHT_COLORS, listBooks,
-  listChapters, listServices, presentClose, presentOpen, presentStatus as fetchPresentStatus, renameService, saveNote,
-  saveServiceItems, setHighlight, setPlanDay, startPlan, stopPlan, toggleBookmark, toNewServiceItem,
+  createPlaylist, deletePlaylist, EMPTY_MARKS, getChapter, getMarks, getPlans, getWordTags, HIGHLIGHT_COLORS, listBooks,
+  listChapters, listPlaylists, presentClose, presentOpen, presentStatus as fetchPresentStatus, renamePlaylist, saveNote,
+  savePlaylistItems, setHighlight, setPlanDay, startPlan, stopPlan, toggleBookmark, toNewPlaylistItem,
 } from "./api";
-import type { Book, ChapterMarks, HighlightColor, NewServiceItem, PresentStatus, Service, StartedPlan, Verse, WordTag } from "./api";
+import type { Book, ChapterMarks, HighlightColor, NewPlaylistItem, PresentStatus, Playlist, StartedPlan, Verse, WordTag } from "./api";
 import { buildQueueSlides, buildSlides, PRESENTATION_WINDOW } from "./presentation";
 import type { Passage, PresentationState, PresentSlide } from "./presentation";
 import { loadPresentationPrefs, savePresentationPrefs } from "./presentationSettings";
@@ -134,8 +134,8 @@ function App() {
   const [refsFor, setRefsFor] = useState<(RefSource & { label: string; text: string }) | null>(null);
 
   // ---- Presentation mode: a saved, orderable "playlist" of passages, plus presenting anything ad hoc ----
-  const [services, setServices] = useState<Service[]>([]);
-  const [activeServiceId, setActiveServiceId] = useState<number | null>(null);
+  const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [activePlaylistId, setActivePlaylistId] = useState<number | null>(null);
   const [queueSlides, setQueueSlides] = useState<PresentSlide[]>([]);
   const [queueIndex, setQueueIndex] = useState(0);
   const [adHoc, setAdHoc] = useState<PresentSlide[] | null>(null);
@@ -253,26 +253,26 @@ function App() {
       })
       .catch((e) => setError(String(e)));
 
-  // Presentation mode's saved services, and resyncing with wherever the live view already is (it can
+  // Presentation mode's saved playlists, and resyncing with wherever the live view already is (it can
   // outlive this component reloading, e.g. after an update installs).
   useEffect(() => {
-    listServices().then(setServices).catch((e) => console.error(e));
+    listPlaylists().then(setPlaylists).catch((e) => console.error(e));
     fetchPresentStatus().then(setLiveStatus).catch((e) => console.error(e));
   }, []);
-  const refreshServices = () => listServices().then(setServices).catch((e) => setNotice(`That didn’t save: ${e}`));
-  const createNewService = (name: string) =>
-    createService(name)
+  const refreshPlaylists = () => listPlaylists().then(setPlaylists).catch((e) => setNotice(`That didn’t save: ${e}`));
+  const createNewPlaylist = (name: string) =>
+    createPlaylist(name)
       .then((id) => {
-        setActiveServiceId(id);
-        return refreshServices();
+        setActivePlaylistId(id);
+        return refreshPlaylists();
       })
       .catch((e) => setNotice(`That didn’t save: ${e}`));
-  const renameActiveService = (id: number, name: string) => void renameService(id, name).then(refreshServices).catch((e) => setNotice(`That didn’t save: ${e}`));
-  const deleteActiveService = (id: number) => {
-    if (activeServiceId === id) setActiveServiceId(null);
-    void deleteService(id).then(refreshServices).catch((e) => setNotice(`That didn’t save: ${e}`));
+  const renameActivePlaylist = (id: number, name: string) => void renamePlaylist(id, name).then(refreshPlaylists).catch((e) => setNotice(`That didn’t save: ${e}`));
+  const deleteActivePlaylist = (id: number) => {
+    if (activePlaylistId === id) setActivePlaylistId(null);
+    void deletePlaylist(id).then(refreshPlaylists).catch((e) => setNotice(`That didn’t save: ${e}`));
   };
-  const saveItems = (id: number, items: NewServiceItem[]) => void saveServiceItems(id, items).then(refreshServices).catch((e) => setNotice(`That didn’t save: ${e}`));
+  const saveItems = (id: number, items: NewPlaylistItem[]) => void savePlaylistItems(id, items).then(refreshPlaylists).catch((e) => setNotice(`That didn’t save: ${e}`));
 
   // The glossary needs the book list to resolve its verse references. A bad entry must not take the reader down.
   const glossary = useMemo(() => {
@@ -535,21 +535,21 @@ function App() {
     setNote(null);
   };
 
-  // ---- Presentation mode: turning the active service into a flowing list of slides, and driving
+  // ---- Presentation mode: turning the active playlist into a flowing list of slides, and driving
   // whichever screen is projecting them (a second window, or this window full-screened) ----
 
-  const activeService = services.find((s) => s.id === activeServiceId) ?? null;
+  const activePlaylist = playlists.find((s) => s.id === activePlaylistId) ?? null;
 
-  // Rebuilt whenever the active service's passages or the slide granularity change; fetches each
-  // distinct chapter the service touches once, however many items come from it.
+  // Rebuilt whenever the active playlist's passages or the slide granularity change; fetches each
+  // distinct chapter the playlist touches once, however many items come from it.
   useEffect(() => {
-    if (!activeService || activeService.items.length === 0) {
+    if (!activePlaylist || activePlaylist.items.length === 0) {
       setQueueSlides([]);
       setQueueIndex(0);
       return;
     }
     let stale = false;
-    const chapters = [...new Set(activeService.items.map((i) => `${i.book}:${i.chapter}`))];
+    const chapters = [...new Set(activePlaylist.items.map((i) => `${i.book}:${i.chapter}`))];
     Promise.all(
       chapters.map((key) => {
         const [b, c] = key.split(":").map(Number);
@@ -559,7 +559,7 @@ function App() {
       .then((entries) => {
         if (stale) return;
         const byChapter = new Map(entries);
-        const passages: Passage[] = activeService.items.flatMap((item) => {
+        const passages: Passage[] = activePlaylist.items.flatMap((item) => {
           const verses = byChapter.get(`${item.book}:${item.chapter}`) ?? [];
           const end = item.verseEnd ?? item.verse;
           const included = verses.filter((v) => v.verse >= item.verse && v.verse <= end).map((v) => ({ verse: v.verse, text: v.text }));
@@ -568,11 +568,11 @@ function App() {
         });
         setQueueSlides(buildQueueSlides(passages, presentPrefs.granularity));
       })
-      .catch((e) => setNotice(`Couldn’t load the service: ${e}`));
+      .catch((e) => setNotice(`Couldn’t load the playlist: ${e}`));
     return () => {
       stale = true;
     };
-  }, [activeService?.id, activeService?.items, presentPrefs.granularity]);
+  }, [activePlaylist?.id, activePlaylist?.items, presentPrefs.granularity]);
 
   // Keep the queue pointer in range whenever the slide list itself changes shape.
   useEffect(() => {
@@ -654,17 +654,17 @@ function App() {
     setAdHoc(buildSlides(passage, presentPrefs.granularity));
     setAdHocIndex(0);
   };
-  const returnToService = () => setAdHoc(null);
+  const returnToPlaylist = () => setAdHoc(null);
 
-  /** The reader's current selection, ready to add to a service, or null when nothing is selected. */
-  const pendingItem: NewServiceItem | null =
+  /** The reader's current selection, ready to add to a playlist, or null when nothing is selected. */
+  const pendingItem: NewPlaylistItem | null =
     loaded && chosen.length > 0
       ? { book: loaded.book, chapter: loaded.chapter, ...span(chosen), label: null }
       : null;
-  /** Adds the reader's current selection to the active service; null when there's nothing to add to. */
-  const addPendingToService =
-    activeService && pendingItem
-      ? () => saveItems(activeService.id, [...activeService.items.map(toNewServiceItem), pendingItem])
+  /** Adds the reader's current selection to the active playlist; null when there's nothing to add to. */
+  const addPendingToPlaylist =
+    activePlaylist && pendingItem
+      ? () => saveItems(activePlaylist.id, [...activePlaylist.items.map(toNewPlaylistItem), pendingItem])
       : null;
 
   // ---- Keyboard: a verse cursor, and stepping through the glossary words ----
@@ -947,7 +947,7 @@ function App() {
             onRefs={chosen.length === 1 ? openRefs : null}
             presenting={presenting}
             onPresentNow={presentNow}
-            onAddToService={addPendingToService}
+            onAddToPlaylist={addPendingToPlaylist}
             onClear={clearSelection}
           />
         </div>
@@ -956,12 +956,12 @@ function App() {
       {presenting && (
         <div inert={overlayOpen}>
           <PresentationDock
-            services={services}
-            activeServiceId={activeServiceId}
-            onSelectService={setActiveServiceId}
-            onCreateService={createNewService}
-            onRenameService={renameActiveService}
-            onDeleteService={deleteActiveService}
+            playlists={playlists}
+            activePlaylistId={activePlaylistId}
+            onSelectPlaylist={setActivePlaylistId}
+            onCreatePlaylist={createNewPlaylist}
+            onRenamePlaylist={renameActivePlaylist}
+            onDeletePlaylist={deleteActivePlaylist}
             onSaveItems={saveItems}
             titleOf={bookTitle}
             presentState={presentState}
@@ -969,7 +969,7 @@ function App() {
             slideIndex={currentIndex}
             slideCount={currentSlides.length}
             usingAdHoc={usingAdHoc}
-            onReturnToService={returnToService}
+            onReturnToPlaylist={returnToPlaylist}
             onNext={goNext}
             onPrev={goPrev}
             blank={blank}

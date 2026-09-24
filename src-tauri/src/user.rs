@@ -61,17 +61,17 @@ const MIGRATIONS: &[&str] = &[
         PRIMARY KEY (plan, day)
     ) WITHOUT ROWID;
     ",
-    // Saved presentation-mode "services": an ordered list of passages to project during a church service.
+    // Saved presentation-mode playlists: an ordered list of passages to project during a church service.
     "
-    CREATE TABLE services (
+    CREATE TABLE playlists (
         id INTEGER PRIMARY KEY,
         name TEXT NOT NULL,
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
-    CREATE TABLE service_items (
+    CREATE TABLE playlist_items (
         id INTEGER PRIMARY KEY,
-        service INTEGER NOT NULL,
+        playlist INTEGER NOT NULL,
         position INTEGER NOT NULL,
         book INTEGER NOT NULL,
         chapter INTEGER NOT NULL,
@@ -79,7 +79,7 @@ const MIGRATIONS: &[&str] = &[
         verse_end INTEGER,
         label TEXT
     );
-    CREATE INDEX service_items_service ON service_items (service, position);
+    CREATE INDEX playlist_items_playlist ON playlist_items (playlist, position);
     ",
 ];
 
@@ -374,7 +374,7 @@ mod tests {
     }
 
     #[test]
-    fn upgrades_a_version_3_database_and_adds_services() {
+    fn upgrades_a_version_3_database_and_adds_playlists() {
         // What the app created before presentation mode: everything up through reading plans.
         let tmp = TempDb::new("upgrade-v3");
         {
@@ -388,7 +388,7 @@ mod tests {
         let conn = open(&tmp.path()).unwrap();
         assert_eq!(version(&conn), MIGRATIONS.len() as i64);
         assert_eq!(chapter_marks(&conn, JOHN, 3).unwrap().bookmarks, [16]);
-        assert!(crate::services::list_services(&conn).unwrap().is_empty());
+        assert!(crate::playlists::list_playlists(&conn).unwrap().is_empty());
     }
 
     #[test]

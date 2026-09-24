@@ -10,29 +10,36 @@ Branch: `presentation-mode` (not merged into `main`).
 - Commit `96d0bdb` — first working version: ad-hoc presenting, a saved/queued "service" of
   passages, a modal control panel, auto-detected second-monitor fullscreen with a single-monitor
   fallback that took over the main window.
-- **Uncommitted on top of that** (in the working tree right now, not yet committed): the full
-  redesign described below, plus three small follow-up tweaks:
+- Commit `5b6e1a0` — the full redesign described below, plus three small follow-up tweaks:
   - Removed the "High contrast" screen-color option; Dark/Light is now one toggle button instead
     of two separate buttons. The verse-by-verse/whole-passage choice is likewise one toggle button.
   - Fixed a latent CSS bug found while touching this: the "Blank screen" button's pressed state had
     no visual highlight (a leftover `.pres-group` class nothing actually used); now uses `.pres-row
     button[aria-pressed="true"]` so it lights up correctly.
-  - Renamed the user-facing term "Service" to **"Playlist"** everywhere it appears in the UI
-    (section heading, dropdown, "Add to playlist", "Return to the playlist", empty states). This
-    was a wording-only change — internal names (`Service`/`ServiceItem` types, `services.rs`, the
-    `services`/`service_items` DB tables, `list_services`/`create_service`/etc.) were left alone.
-    If a full internal rename is ever wanted too, it's a bigger, riskier change (touches a live
-    migration) that hasn't been done.
+  - Renamed the user-facing term "Service" to **"Playlist"** everywhere it appears in the UI.
+- Next commit — the internal rename to match: `services.rs` → `playlists.rs`, `Service`/
+  `ServiceItem`/`NewServiceItem` → `Playlist`/`PlaylistItem`/`NewPlaylistItem`, the Tauri commands
+  (`list_playlists`, `create_playlist`, `rename_playlist`, `delete_playlist`,
+  `save_playlist_items`), the `api.ts` wrappers, React props/state, and the mock backend. The
+  unnamed fallback is now "Untitled playlist". Uses of "service" that mean an actual church service
+  were left as-is.
+  - **The DB migration was edited in place, not added to.** Migration 4 now creates
+    `playlists`/`playlist_items` (column `playlist`, index `playlist_items_playlist`) instead of
+    `services`/`service_items`. That's safe only because migration 4 has never shipped. No release
+    includes it, and the branch was never pushed. The one existing v4 database (the developer's own
+    `~/.local/share/com.jxyeverfight.bibleapp/user.db`) was converted by hand with `ALTER TABLE ...
+    RENAME`, with a backup at `user.db.bak-before-playlist-rename`. **After this branch is released,
+    never edit migration 4 again. Add a new migration instead.**
 
-**Next session should start by running `git status`/`git diff` on this branch** to see the exact
-uncommitted diff, and decide whether to commit it (the user asked to "save this" — commit it as-is
-unless told otherwise) and whether to push/merge.
+Nothing is uncommitted; nothing has been pushed or merged yet.
 
 **Not yet done / open items:**
 - Manual multi-monitor QA has not been performed (only headless-Chromium and a real single-monitor
   Tauri run were tested) — see the Verification section below for the exact checklist.
-- Whether to rename the internal `Service` concept to match "Playlist" (currently just a UI label
-  change, see above).
+- Push / merge into `main`.
+
+(The file-by-file notes below were written before the internal rename, so they still use the old
+`Service`/`services.rs` names.)
 
 ## Why this redesign happened
 

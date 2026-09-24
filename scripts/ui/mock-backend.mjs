@@ -33,10 +33,10 @@ const ftsQuery = (q) => {
 export function createBackend({ update = null } = {}) {
   const plans = new Map(); // started reading plans: id -> { plan, startedOn, done: Map(day -> date) }
   const marks = { highlights: new Map(), notes: [], bookmarks: new Set(), nextId: 1 };
-  // Presentation mode: saved services, and where the (nonexistent, in a headless browser) live view is.
-  const services = new Map(); // id -> { id, name, updatedAt, items: [{id, book, chapter, verse, verseEnd, label}] }
-  let servicesNextId = 1;
-  let serviceItemNextId = 1;
+  // Presentation mode: saved playlists, and where the (nonexistent, in a headless browser) live view is.
+  const playlists = new Map(); // id -> { id, name, updatedAt, items: [{id, book, chapter, verse, verseEnd, label}] }
+  let playlistsNextId = 1;
+  let playlistItemNextId = 1;
   let presentIsOpen = false; // there is never a second monitor in headless Chromium, so it's never fullscreen anywhere.
   const key = (b, c, v) => `${b}:${c}:${v}`;
   const parse = (k) => k.split(":").map(Number);
@@ -177,23 +177,23 @@ export function createBackend({ update = null } = {}) {
         highlights: runs.map(entry),
       };
     },
-    list_services: () => [...services.values()]
+    list_playlists: () => [...playlists.values()]
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || b.id - a.id)
       .map((s) => ({ ...s, items: [...s.items] })),
-    create_service: ({ name }) => {
-      const id = servicesNextId++;
-      services.set(id, { id, name: name.trim() || "Untitled service", updatedAt: new Date().toISOString(), items: [] });
+    create_playlist: ({ name }) => {
+      const id = playlistsNextId++;
+      playlists.set(id, { id, name: name.trim() || "Untitled playlist", updatedAt: new Date().toISOString(), items: [] });
       return id;
     },
-    rename_service: ({ id, name }) => {
-      const s = services.get(id);
-      if (s) { s.name = name.trim() || "Untitled service"; s.updatedAt = new Date().toISOString(); }
+    rename_playlist: ({ id, name }) => {
+      const s = playlists.get(id);
+      if (s) { s.name = name.trim() || "Untitled playlist"; s.updatedAt = new Date().toISOString(); }
     },
-    delete_service: ({ id }) => { services.delete(id); },
-    save_service_items: ({ id, items }) => {
-      const s = services.get(id);
+    delete_playlist: ({ id }) => { playlists.delete(id); },
+    save_playlist_items: ({ id, items }) => {
+      const s = playlists.get(id);
       if (!s) return;
-      s.items = items.map((it) => ({ id: serviceItemNextId++, ...it }));
+      s.items = items.map((it) => ({ id: playlistItemNextId++, ...it }));
       s.updatedAt = new Date().toISOString();
     },
     // No real second window exists in a headless browser; the dock's own live preview (driven by

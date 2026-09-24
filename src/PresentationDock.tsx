@@ -1,19 +1,19 @@
 import { useState } from "react";
-import type { NewServiceItem, PresentStatus, Service, ServiceItem } from "./api";
-import { toNewServiceItem } from "./api";
+import type { NewPlaylistItem, PresentStatus, Playlist, PlaylistItem } from "./api";
+import { toNewPlaylistItem } from "./api";
 import { GRANULARITY_LABELS, PRESENT_THEMES } from "./presentation";
 import type { Granularity, PresentationState, PresentSlide, PresentTheme } from "./presentation";
 import { PresentationView } from "./PresentationView";
 import { referenceLabel } from "./verses";
 
 interface Props {
-  services: Service[];
-  activeServiceId: number | null;
-  onSelectService: (id: number | null) => void;
-  onCreateService: (name: string) => void;
-  onRenameService: (id: number, name: string) => void;
-  onDeleteService: (id: number) => void;
-  onSaveItems: (id: number, items: NewServiceItem[]) => void;
+  playlists: Playlist[];
+  activePlaylistId: number | null;
+  onSelectPlaylist: (id: number | null) => void;
+  onCreatePlaylist: (name: string) => void;
+  onRenamePlaylist: (id: number, name: string) => void;
+  onDeletePlaylist: (id: number) => void;
+  onSaveItems: (id: number, items: NewPlaylistItem[]) => void;
   titleOf: (book: number) => string;
 
   presentState: PresentationState;
@@ -21,7 +21,7 @@ interface Props {
   slideIndex: number;
   slideCount: number;
   usingAdHoc: boolean;
-  onReturnToService: () => void;
+  onReturnToPlaylist: () => void;
   onNext: () => void;
   onPrev: () => void;
 
@@ -44,18 +44,18 @@ interface Props {
  * the reader stays fully interactive behind it, since that's how passages get selected to present.
  */
 export function PresentationDock({
-  services, activeServiceId, onSelectService, onCreateService, onRenameService, onDeleteService, onSaveItems,
+  playlists, activePlaylistId, onSelectPlaylist, onCreatePlaylist, onRenamePlaylist, onDeletePlaylist, onSaveItems,
   titleOf,
-  presentState, slide, slideIndex, slideCount, usingAdHoc, onReturnToService, onNext, onPrev,
+  presentState, slide, slideIndex, slideCount, usingAdHoc, onReturnToPlaylist, onNext, onPrev,
   blank, onToggleBlank, granularity, onGranularity, theme, onTheme,
   status, onStop, onRedetect,
 }: Props) {
   const [newName, setNewName] = useState("");
   const [renaming, setRenaming] = useState<string | null>(null);
 
-  const active = services.find((s) => s.id === activeServiceId) ?? null;
+  const active = playlists.find((s) => s.id === activePlaylistId) ?? null;
 
-  const itemLabel = (item: ServiceItem) => {
+  const itemLabel = (item: PlaylistItem) => {
     const end = item.verseEnd ?? item.verse;
     const verses = Array.from({ length: end - item.verse + 1 }, (_, i) => item.verse + i);
     return item.label || referenceLabel(titleOf(item.book), item.chapter, verses);
@@ -63,7 +63,7 @@ export function PresentationDock({
 
   const removeItem = (i: number) => {
     if (!active) return;
-    onSaveItems(active.id, active.items.filter((_, j) => j !== i).map(toNewServiceItem));
+    onSaveItems(active.id, active.items.filter((_, j) => j !== i).map(toNewPlaylistItem));
   };
   const moveItem = (i: number, dir: 1 | -1) => {
     if (!active) return;
@@ -71,17 +71,17 @@ export function PresentationDock({
     if (j < 0 || j >= active.items.length) return;
     const next = [...active.items];
     [next[i], next[j]] = [next[j], next[i]];
-    onSaveItems(active.id, next.map(toNewServiceItem));
+    onSaveItems(active.id, next.map(toNewPlaylistItem));
   };
 
-  const createService = (e: React.FormEvent) => {
+  const createPlaylist = (e: React.FormEvent) => {
     e.preventDefault();
-    if (newName.trim()) onCreateService(newName);
+    if (newName.trim()) onCreatePlaylist(newName);
     setNewName("");
   };
   const saveRename = (e: React.FormEvent) => {
     e.preventDefault();
-    if (active && renaming !== null) onRenameService(active.id, renaming);
+    if (active && renaming !== null) onRenamePlaylist(active.id, renaming);
     setRenaming(null);
   };
 
@@ -130,7 +130,7 @@ export function PresentationDock({
             </button>
           </div>
           {usingAdHoc && (
-            <button className="set-link" onClick={onReturnToService}>
+            <button className="set-link" onClick={onReturnToPlaylist}>
               Return to the playlist
             </button>
           )}
@@ -156,9 +156,9 @@ export function PresentationDock({
         <section aria-label="Playlist" className="pres-section">
           <h3 className="plans-subhead">Playlist</h3>
           <div className="pres-row">
-            <select aria-label="Active playlist" value={activeServiceId ?? ""} onChange={(e) => onSelectService(e.target.value ? Number(e.target.value) : null)}>
+            <select aria-label="Active playlist" value={activePlaylistId ?? ""} onChange={(e) => onSelectPlaylist(e.target.value ? Number(e.target.value) : null)}>
               <option value="">Choose a playlist…</option>
-              {services.map((s) => (
+              {playlists.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
                 </option>
@@ -166,7 +166,7 @@ export function PresentationDock({
             </select>
             {active && renaming === null && <button onClick={() => setRenaming(active.name)}>Rename</button>}
             {active && (
-              <button className="pres-danger" onClick={() => onDeleteService(active.id)}>
+              <button className="pres-danger" onClick={() => onDeletePlaylist(active.id)}>
                 Delete
               </button>
             )}
@@ -182,7 +182,7 @@ export function PresentationDock({
             </form>
           )}
 
-          <form className="pres-row" onSubmit={createService}>
+          <form className="pres-row" onSubmit={createPlaylist}>
             <input aria-label="New playlist name" placeholder="New playlist name" value={newName} onChange={(e) => setNewName(e.target.value)} />
             <button type="submit">Create</button>
           </form>

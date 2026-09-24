@@ -22,14 +22,14 @@ interface Props {
   /** Projects the selection right away. */
   onPresentNow: () => void;
   /** Adds the selection to the active playlist; null when there's no active playlist to add to. */
-  onAddToService: (() => void) | null;
+  onAddToPlaylist: (() => void) | null;
   onClear: () => void;
 }
 
 /** The toolbar that appears over the reading page while verses are selected. */
 export function SelectionBar({
   label, color, hasNote, bookmarked, copied, onColor, onNote, onBookmark, onCopy, onShare, onRefs,
-  presenting, onPresentNow, onAddToService, onClear,
+  presenting, onPresentNow, onAddToPlaylist, onClear,
 }: Props) {
   return (
     <div className="selbar" role="toolbar" aria-label={`Actions for ${label}`} onMouseDown={(e) => e.preventDefault()}>
@@ -42,9 +42,9 @@ export function SelectionBar({
           </button>
           <button
             className="selbar-action"
-            onClick={onAddToService ?? undefined}
-            disabled={!onAddToService}
-            title={onAddToService ? "Add to the active playlist" : "Choose or create a playlist first"}
+            onClick={onAddToPlaylist ?? undefined}
+            disabled={!onAddToPlaylist}
+            title={onAddToPlaylist ? "Add to the active playlist" : "Choose or create a playlist first"}
           >
             Add to playlist
           </button>
