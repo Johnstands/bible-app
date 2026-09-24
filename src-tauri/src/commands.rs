@@ -5,8 +5,10 @@ use crate::strongs::{self, StrongsEntry, VerseTags};
 use crate::cards;
 use crate::crossrefs::{self, CrossRef};
 use crate::playlists::{self, NewItem, Playlist};
+use crate::decks;
 use crate::AppState;
-use tauri::{Manager, State};
+use std::path::PathBuf;
+use tauri::{AppHandle, Manager, State};
 
 const DEFAULT_SEARCH_LIMIT: u32 = 50;
 const MAX_SEARCH_LIMIT: u32 = 500;
@@ -176,13 +178,31 @@ pub fn rename_playlist(state: State<AppState>, id: i64, name: String) -> Result<
 }
 
 #[tauri::command]
-pub fn delete_playlist(state: State<AppState>, id: i64) -> Result<()> {
-    playlists::delete_playlist(&state.user.lock().unwrap(), id)
+pub fn delete_playlist(app: AppHandle, state: State<AppState>, id: i64) -> Result<()> {
+    let unused = playlists::delete_playlist(&state.user.lock().unwrap(), id)?;
+    decks::delete_files(&decks_root(&app)?, &unused);
+    Ok(())
 }
 
 #[tauri::command]
-pub fn save_playlist_items(state: State<AppState>, id: i64, items: Vec<NewItem>) -> Result<()> {
-    playlists::save_playlist_items(&state.user.lock().unwrap(), id, &items)
+pub fn save_playlist_items(app: AppHandle, state: State<AppState>, id: i64, items: Vec<NewItem>) -> Result<()> {
+    let unused = playlists::save_playlist_items(&state.user.lock().unwrap(), id, &items)?;
+    decks::delete_files(&decks_root(&app)?, &unused);
+    Ok(())
+}
+
+/// Where slide decks' images are stored.
+fn decks_root(app: &AppHandle) -> Result<PathBuf> {
+    Ok(app.path().app_data_dir()?.join(decks::DIR))
+}
+
+/// Adds images (in the order given) to the end of a playlist as one deck of slides. Async so copying
+/// large images doesn't hold up the UI thread.
+#[tauri::command]
+pub async fn import_slides(app: AppHandle, state: State<'_, AppState>, playlist: i64, paths: Vec<PathBuf>) -> Result<()> {
+    let root = decks_root(&app)?;
+    decks::import_images(&state.user.lock().unwrap(), &root, playlist, &paths)?;
+    Ok(())
 }
 
 #[tauri::command]

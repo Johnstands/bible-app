@@ -1,8 +1,8 @@
 import { useState } from "react";
 import type { NewPlaylistItem, PresentStatus, Playlist, PlaylistItem } from "./api";
-import { toNewPlaylistItem } from "./api";
-import { GRANULARITY_LABELS, PRESENT_THEMES } from "./presentation";
-import type { Granularity, PresentationState, PresentSlide, PresentTheme } from "./presentation";
+import { slideSrc, toNewPlaylistItem } from "./api";
+import { GRANULARITY_LABELS, PRESENT_THEMES, slideCaption } from "./presentation";
+import type { Granularity, ItemSpan, PresentationState, PresentSlide, PresentTheme } from "./presentation";
 import { PresentationView } from "./PresentationView";
 import { referenceLabel } from "./verses";
 
@@ -21,7 +21,18 @@ interface Props {
   slideIndex: number;
   slideCount: number;
   usingAdHoc: boolean;
+  /** What returning from an ad-hoc passage goes back to, e.g. "Songs.png · 3 of 5". */
+  returnLabel: string | null;
   onReturnToPlaylist: () => void;
+  /** Where each playlist item's slides sit in the queue, in item order. */
+  itemSpans: ItemSpan[];
+  /** The item on screen (-1 for none, or an ad-hoc passage), and its slide's queue index. */
+  liveItem: number;
+  liveSlide: number;
+  onJumpToItem: (i: number) => void;
+  onJumpToSlide: (queueIndex: number) => void;
+  importing: boolean;
+  onAddSlides: () => void;
   onNext: () => void;
   onPrev: () => void;
 
@@ -46,16 +57,26 @@ interface Props {
 export function PresentationDock({
   playlists, activePlaylistId, onSelectPlaylist, onCreatePlaylist, onRenamePlaylist, onDeletePlaylist, onSaveItems,
   titleOf,
-  presentState, slide, slideIndex, slideCount, usingAdHoc, onReturnToPlaylist, onNext, onPrev,
+  presentState, slide, slideIndex, slideCount, usingAdHoc, returnLabel, onReturnToPlaylist,
+  itemSpans, liveItem, liveSlide, onJumpToItem, onJumpToSlide, importing, onAddSlides, onNext, onPrev,
   blank, onToggleBlank, granularity, onGranularity, theme, onTheme,
   status, onStop, onRedetect,
 }: Props) {
   const [newName, setNewName] = useState("");
   const [renaming, setRenaming] = useState<string | null>(null);
+  /** Deck items (by item id) whose slide strip is open; the live deck's is always open. */
+  const [expanded, setExpanded] = useState<ReadonlySet<number>>(new Set());
+  const toggleExpanded = (id: number) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
 
   const active = playlists.find((s) => s.id === activePlaylistId) ?? null;
 
   const itemLabel = (item: PlaylistItem) => {
+    if (item.kind === "deck") return item.label || item.name;
     const end = item.verseEnd ?? item.verse;
     const verses = Array.from({ length: end - item.verse + 1 }, (_, i) => item.verse + i);
     return item.label || referenceLabel(titleOf(item.book), item.chapter, verses);
@@ -111,7 +132,11 @@ export function PresentationDock({
 
           <div className="pres-preview-wrap">
             <p className="pres-preview-meta">
-              {slide ? `${slide.reference}${slideCount > 1 ? ` · ${slideIndex + 1} of ${slideCount}` : ""}` : "Nothing on screen yet"}
+              {slide
+                ? slide.kind === "image"
+                  ? slideCaption(slide)
+                  : `${slide.reference}${slideCount > 1 ? ` · ${slideIndex + 1} of ${slideCount}` : ""}`
+                : "Nothing on screen yet"}
             </p>
             <div className="pres-preview-frame">
               <PresentationView state={presentState} />
@@ -131,7 +156,7 @@ export function PresentationDock({
           </div>
           {usingAdHoc && (
             <button className="set-link" onClick={onReturnToPlaylist}>
-              Return to the playlist
+              {returnLabel ? `Back to ${returnLabel}` : "Return to the playlist"}
             </button>
           )}
 
@@ -189,29 +214,83 @@ export function PresentationDock({
 
           {active ? (
             active.items.length === 0 ? (
-              <p className="goto-empty">No passages yet. Select verses in the reader, then choose "Add to playlist" there.</p>
+              <p className="goto-empty">
+                Nothing here yet. Select verses in the reader, then choose "Add to playlist" there, or add slides below.
+              </p>
             ) : (
               <ol className="pres-items">
-                {active.items.map((item, i) => (
-                  <li key={item.id} className="pres-item">
-                    <span className="pres-item-ref">{itemLabel(item)}</span>
-                    <span className="pres-item-actions">
-                      <button aria-label="Move up" disabled={i === 0} onClick={() => moveItem(i, -1)}>
-                        ↑
-                      </button>
-                      <button aria-label="Move down" disabled={i === active.items.length - 1} onClick={() => moveItem(i, 1)}>
-                        ↓
-                      </button>
-                      <button aria-label={`Remove ${itemLabel(item)}`} onClick={() => removeItem(i)}>
-                        ×
-                      </button>
-                    </span>
-                  </li>
-                ))}
+                {active.items.map((item, i) => {
+                  const span = itemSpans[i];
+                  const live = i === liveItem;
+                  const open = item.kind === "deck" && (live || expanded.has(item.id));
+                  return (
+                    <li key={item.id} className="pres-item" data-live={live || undefined}>
+                      <div className="pres-item-row">
+                        <button
+                          className="pres-item-go"
+                          aria-current={live || undefined}
+                          disabled={!span || span.count === 0}
+                          title={live ? "On screen now" : "Show this now"}
+                          onClick={() => onJumpToItem(i)}
+                        >
+                          {item.kind === "deck" && <img className="pres-thumb" src={slideSrc(item.deck, 0)} alt="" />}
+                          <span className="pres-item-ref">{itemLabel(item)}</span>
+                          {item.kind === "deck" && <span className="pres-item-count">{item.slideCount === 1 ? "1 slide" : `${item.slideCount} slides`}</span>}
+                        </button>
+                        <span className="pres-item-actions">
+                          {item.kind === "deck" && item.slideCount > 1 && !live && (
+                            <button aria-expanded={open} aria-label={`${open ? "Hide" : "Show"} the slides in ${itemLabel(item)}`} onClick={() => toggleExpanded(item.id)}>
+                              {open ? "▴" : "▾"}
+                            </button>
+                          )}
+                          <button aria-label="Move up" disabled={i === 0} onClick={() => moveItem(i, -1)}>
+                            ↑
+                          </button>
+                          <button aria-label="Move down" disabled={i === active.items.length - 1} onClick={() => moveItem(i, 1)}>
+                            ↓
+                          </button>
+                          <button aria-label={`Remove ${itemLabel(item)}`} onClick={() => removeItem(i)}>
+                            ×
+                          </button>
+                        </span>
+                      </div>
+                      {open && span && item.slideCount > 1 && (
+                        <ol className="pres-strip" aria-label={`Slides in ${itemLabel(item)}`}>
+                          {Array.from({ length: span.count }, (_, j) => (
+                            <li key={j}>
+                              <button
+                                className="pres-strip-slide"
+                                aria-current={span.start + j === liveSlide || undefined}
+                                aria-label={`Show slide ${j + 1} of ${span.count}`}
+                                onClick={() => onJumpToSlide(span.start + j)}
+                              >
+                                <img src={slideSrc(item.deck, j)} alt="" loading="lazy" />
+                              </button>
+                            </li>
+                          ))}
+                        </ol>
+                      )}
+                    </li>
+                  );
+                })}
               </ol>
             )
           ) : (
             <p className="goto-empty">Choose or create a playlist to build it.</p>
+          )}
+
+          {active && (
+            <>
+              <div className="pres-row">
+                <button onClick={onAddSlides} disabled={importing}>
+                  {importing ? "Adding slides…" : "Add slides…"}
+                </button>
+              </div>
+              <p className="pres-hint">
+                Pictures (PNG or JPG). Choose several at once to add them as one set, in filename order. Export a PowerPoint as
+                pictures first; animations and videos don’t carry over.
+              </p>
+            </>
           )}
         </section>
       </div>

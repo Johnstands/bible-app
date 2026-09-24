@@ -4,7 +4,8 @@ Adding slide decks (PowerPoint, Keynote, PDF, plain images) to a presentation-mo
 service can go *welcome slide → Psalm 100 → song lyrics → John 3:16 → announcements* and
 Next/Previous steps straight through all of it.
 
-Status: **plan only, nothing built yet.** Branch: `slides-import`.
+Status: **step 1 of 4 built** (image slides + click-to-jump), on branch `slides-import`, not merged.
+See "Progress" at the end.
 
 ## What the user sees
 
@@ -218,3 +219,43 @@ path validation), `npm test` (slide building with mixed items, pdf render), `npm
   in step 1.
 - A deck is added whole for now (a range can be added later). Image slides are letterboxed on
   black. These are defaults, not user decisions yet; easy to change.
+
+## Progress
+
+### Step 1 — done (2026-09-24)
+
+Built as planned, except that the importer takes **images only** for now, so the file picker offers
+PNG/JPG/WebP/GIF. Several pictures chosen at once become one deck, ordered by filename with
+numbers compared as numbers ("Slide2" before "Slide10"). The deck is named after the first file
+("Slide2.png + 2 more").
+
+- Rust: migration 5; `decks.rs` (`import_images`, the `slides://` handler `serve`, request-path
+  validation, `delete_files`); `playlists.rs` items are a `kind`-tagged enum; save/delete return
+  now-unused decks, and `commands.rs` deletes their folders; `import_slides` command (async);
+  `tauri-plugin-dialog`, with `dialog:allow-open` in the main window's capability.
+- Frontend: `PresentSlide = VerseSlide | ImageSlide`; `buildQueue` returns `{slides, items}` spans
+  plus `itemAt`; the dock has click-to-jump items, a slide-thumbnail strip (always open for the live
+  deck, toggle for others), the live highlight, "Back to … · 7 of 12", and **Add slides…**.
+- Import and add-to-playlist happen in one DB transaction, so a fresh deck is never momentarily
+  unused and can't be cleaned up in between.
+
+**Existing layout bugs fixed along the way** (both from the first presentation-mode work):
+- While presenting, the selection toolbar was centered on the whole window, so "Add to playlist"
+  and the × ended up under the dock. It now centers over the reader, and on narrow windows sits
+  above the bottom sheet.
+- On narrow windows (≤900px) the bottom-sheet dock was still only 24rem wide. It's now full width,
+  the preview is capped at 28rem, and the reader gets bottom padding so a chapter's last verses can
+  scroll above the sheet.
+- The UI tests' mock server wrote its response headers before running the command, so any command
+  that threw crashed the request instead of returning its error. Fixed.
+
+**Verified:** `cargo test` 83 (10 new: migration 4→5 upgrade, deck import/serve/cleanup, path
+validation, serde shape); `npm test` 128; `npm run test:ui` 118 (new `tests/ui/slides.e2e.ts`, 9
+tests incl. axe); `tsc` clean; the real app launched on this machine and migrated the developer's
+own `user.db` from v4 to v5 with its playlist intact (backup at `user.db.bak-before-migration-5`).
+
+**Not verified yet:** the real `slides://` scheme and the real file picker inside the Tauri window.
+The UI tests use stand-ins for both. Next time the app is open: Present → a playlist → Add slides…
+→ pick a few pictures → check they show in the dock and on the projection window.
+
+### Next: step 2 (PDF import via pdf.js)

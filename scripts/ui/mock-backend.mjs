@@ -34,9 +34,24 @@ export function createBackend({ update = null } = {}) {
   const plans = new Map(); // started reading plans: id -> { plan, startedOn, done: Map(day -> date) }
   const marks = { highlights: new Map(), notes: [], bookmarks: new Set(), nextId: 1 };
   // Presentation mode: saved playlists, and where the (nonexistent, in a headless browser) live view is.
-  const playlists = new Map(); // id -> { id, name, updatedAt, items: [{id, book, chapter, verse, verseEnd, label}] }
+  const playlists = new Map(); // id -> { id, name, updatedAt, items: [{id, kind: "passage", book, …} | {id, kind: "deck", deck, name, slideCount, label}] }
   let playlistsNextId = 1;
   let playlistItemNextId = 1;
+  const decks = new Map(); // id -> { name, slideCount }; their "images" are drawn by serve() below
+  let decksNextId = 1;
+  // What the next "Add slides…" file picker returns; a test can change it with mock:set_picker.
+  let pickerPaths = ["/home/user/Pictures/Welcome.png", "/home/user/Pictures/Slide10.png", "/home/user/Pictures/Slide2.png"];
+  /** A saved item as list_playlists returns it: deck items carry their deck's name and size. */
+  const storedItem = (it) => {
+    const item = { id: playlistItemNextId++, ...it };
+    if (it.kind === "deck") Object.assign(item, decks.get(it.deck));
+    return item;
+  };
+  /** Forgets decks no playlist uses any more, like the real backend. */
+  const removeUnusedDecks = () => {
+    const used = new Set([...playlists.values()].flatMap((p) => p.items.filter((i) => i.kind === "deck").map((i) => i.deck)));
+    for (const id of decks.keys()) if (!used.has(id)) decks.delete(id);
+  };
   let presentIsOpen = false; // there is never a second monitor in headless Chromium, so it's never fullscreen anywhere.
   const key = (b, c, v) => `${b}:${c}:${v}`;
   const parse = (k) => k.split(":").map(Number);
@@ -189,13 +204,27 @@ export function createBackend({ update = null } = {}) {
       const s = playlists.get(id);
       if (s) { s.name = name.trim() || "Untitled playlist"; s.updatedAt = new Date().toISOString(); }
     },
-    delete_playlist: ({ id }) => { playlists.delete(id); },
+    delete_playlist: ({ id }) => { playlists.delete(id); removeUnusedDecks(); },
     save_playlist_items: ({ id, items }) => {
       const s = playlists.get(id);
       if (!s) return;
-      s.items = items.map((it) => ({ id: playlistItemNextId++, ...it }));
+      s.items = items.map(storedItem);
+      s.updatedAt = new Date().toISOString();
+      removeUnusedDecks();
+    },
+    import_slides: ({ playlist, paths }) => {
+      const s = playlists.get(playlist);
+      if (!s) throw new Error("That playlist no longer exists.");
+      const bad = paths.find((p) => !/\.(png|jpe?g|webp|gif)$/i.test(p));
+      if (bad) throw new Error(`${bad} isn't a supported image (PNG, JPG, WebP or GIF).`);
+      const first = paths[0].split("/").pop();
+      const deck = decksNextId++;
+      decks.set(deck, { name: paths.length === 1 ? first : `${first} + ${paths.length - 1} more`, slideCount: paths.length });
+      s.items.push(storedItem({ kind: "deck", deck, label: null }));
       s.updatedAt = new Date().toISOString();
     },
+    "plugin:dialog|open": () => pickerPaths,
+    "mock:set_picker": ({ paths }) => { pickerPaths = paths; },
     // No real second window exists in a headless browser; the dock's own live preview (driven by
     // React state, not this bridge) is what actually gets exercised by the UI tests for this feature.
     present_open: () => ({ open: (presentIsOpen = true), monitorLabel: null }),
@@ -211,13 +240,27 @@ export function serve(port = 9100, options = {}) {
   const server = http.createServer((req, res) => {
     const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "content-type" };
     if (req.method === "OPTIONS") return res.writeHead(204, cors).end();
+    // Stands in for the app's slides:// scheme (see harness.mjs's convertFileSrc): a numbered placeholder slide.
+    const slide = req.method === "GET" && /^\/slides\/(\d+)%2F(\d+)$/.exec(req.url ?? "");
+    if (slide) {
+      const [, deck, n] = slide;
+      const hue = (Number(deck) * 67) % 360;
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+        <rect width="1600" height="900" fill="hsl(${hue} 45% 32%)"/>
+        <text x="800" y="420" font-family="sans-serif" font-size="120" fill="#fff" text-anchor="middle">Slide ${n}</text>
+        <text x="800" y="560" font-family="sans-serif" font-size="56" fill="#fff" opacity="0.7" text-anchor="middle">Deck ${deck}</text>
+      </svg>`;
+      return res.writeHead(200, { ...cors, "content-type": "image/svg+xml" }).end(svg);
+    }
     let body = "";
     req.on("data", (c) => (body += c));
     req.on("end", () => {
       try {
         const { cmd, args } = JSON.parse(body);
         if (!commands[cmd]) throw new Error(`unknown command ${cmd}`);
-        res.writeHead(200, { ...cors, "content-type": "application/json" }).end(JSON.stringify({ ok: commands[cmd](args ?? {}) ?? null }));
+        // Run the command before writing anything, so one that throws can still answer with its error.
+        const ok = commands[cmd](args ?? {}) ?? null;
+        res.writeHead(200, { ...cors, "content-type": "application/json" }).end(JSON.stringify({ ok }));
       } catch (e) {
         res.writeHead(200, { ...cors, "content-type": "application/json" }).end(JSON.stringify({ err: String(e.message ?? e) }));
       }

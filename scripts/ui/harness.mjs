@@ -15,6 +15,8 @@ const bridge = `
   window.__TAURI_INTERNALS__ = {
     metadata: { currentWindow: { label: "main" }, currentWebview: { label: "main" } },
     transformCallback: () => 0,
+    // Custom URI schemes (the app's slides://) are served by the mock backend instead.
+    convertFileSrc: (path, protocol) => "http://127.0.0.1:9100/" + protocol + "/" + encodeURIComponent(path),
     invoke: async (cmd, args) => {
       const res = await fetch("http://127.0.0.1:9100/invoke", { method: "POST", body: JSON.stringify({ cmd, args }) });
       const out = await res.json();

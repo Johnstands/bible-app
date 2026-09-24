@@ -11,8 +11,8 @@ interface Props {
 }
 
 /**
- * Renders whatever `state` says to show: a blank/black screen, a standby message, or the current
- * slide's text as large as will fit its container. Sizes itself entirely from the box it's given
+ * Renders whatever `state` says to show: a blank/black screen, a standby message, the current
+ * verse slide's text as large as will fit its container, or an imported slide's picture. Sizes itself entirely from the box it's given
  * (a `ResizeObserver` on its own root, not the window), so the same component works full-bleed as
  * the whole UI of the dedicated presentation window (see Presentation.tsx) and small, as the control
  * center's live preview (see PresentationDock.tsx) — the truest possible preview of what's on screen.
@@ -33,9 +33,11 @@ export function PresentationView({ state }: Props) {
   }, []);
 
   const theme = PRESENT_THEMES[state.theme];
+  const slide = state.slide;
+  const verseSlide = slide?.kind === "verse" ? slide : null;
   const padX = Math.round(box.width * 0.08);
   const padY = Math.round(box.height * 0.1);
-  const hasCaption = Boolean(state.slide?.label);
+  const hasCaption = Boolean(verseSlide?.label);
   const captionH = hasCaption ? box.height * 0.07 : 0;
   const refH = box.height * 0.08;
   // Every size below scales with the container (not fixed rem/vh units), so the same component looks
@@ -47,7 +49,7 @@ export function PresentationView({ state }: Props) {
   const refSize = Math.max(10, Math.round(box.width * 0.014));
 
   const fit = useMemo(() => {
-    if (!state.slide || box.width === 0 || box.height === 0) return null;
+    if (!verseSlide || box.width === 0 || box.height === 0) return null;
     const canvas = (measureCanvas.current ??= document.createElement("canvas"));
     const ctx = canvas.getContext("2d")!;
     const measure = (text: string, size: number) => {
@@ -55,20 +57,29 @@ export function PresentationView({ state }: Props) {
       return ctx.measureText(text).width;
     };
     return fitText(
-      state.slide.text,
+      verseSlide.text,
       { width: box.width - padX * 2, height: box.height - padY * 2 - captionH - refH },
       measure,
       { maxSize, minSize, lineHeight: LINE_HEIGHT },
     );
-  }, [state.slide, box, padX, padY, captionH, refH, maxSize, minSize]);
+  }, [verseSlide, box, padX, padY, captionH, refH, maxSize, minSize]);
 
   return (
-    <div ref={wrapRef} className="present-view" style={{ background: theme.bg, color: theme.ink }} data-blank={state.blank || undefined}>
-      {!state.blank && state.slide && (
+    <div
+      ref={wrapRef}
+      className="present-view"
+      // Pictures are letterboxed on black, whatever the verses' Dark/Light setting.
+      style={{ background: slide?.kind === "image" ? "#000" : theme.bg, color: theme.ink }}
+      data-blank={state.blank || undefined}
+    >
+      {!state.blank && slide?.kind === "image" && (
+        <img className="present-image" src={slide.src} alt={`${slide.deckName}, slide ${slide.index + 1} of ${slide.count}`} draggable={false} />
+      )}
+      {!state.blank && verseSlide && (
         <div className="present-slide" style={{ padding: `${padY}px ${padX}px` }}>
-          {state.slide.label && (
+          {verseSlide.label && (
             <p className="present-caption" style={{ color: theme.caption, fontSize: `${captionSize}px` }}>
-              {state.slide.label}
+              {verseSlide.label}
             </p>
           )}
           <p className="present-text" style={{ fontSize: `${fit?.size ?? minSize}px`, lineHeight: LINE_HEIGHT }}>
@@ -79,15 +90,15 @@ export function PresentationView({ state }: Props) {
                 </span>
               ))
             ) : (
-              <span className="present-line">{state.slide.text}</span>
+              <span className="present-line">{verseSlide.text}</span>
             )}
           </p>
           <p className="present-reference" style={{ color: theme.caption, fontSize: `${refSize}px` }}>
-            {state.slide.reference}
+            {verseSlide.reference}
           </p>
         </div>
       )}
-      {!state.blank && !state.slide && (
+      {!state.blank && !slide && (
         <p className="present-standby" style={{ color: theme.caption, fontSize: `${refSize}px` }}>
           Ready to present
         </p>

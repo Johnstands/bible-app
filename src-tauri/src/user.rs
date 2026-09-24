@@ -81,6 +81,34 @@ const MIGRATIONS: &[&str] = &[
     );
     CREATE INDEX playlist_items_playlist ON playlist_items (playlist, position);
     ",
+    // Slide decks in playlists: a playlist item is now either a passage or a deck of slide images
+    // (stored as files under the app data dir, see decks.rs). SQLite can't relax NOT NULL in place,
+    // so playlist_items is rebuilt with nullable passage columns.
+    "
+    CREATE TABLE decks (
+        id INTEGER PRIMARY KEY,
+        name TEXT NOT NULL,
+        slide_count INTEGER NOT NULL,
+        imported_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE playlist_items_new (
+        id INTEGER PRIMARY KEY,
+        playlist INTEGER NOT NULL,
+        position INTEGER NOT NULL,
+        book INTEGER,
+        chapter INTEGER,
+        verse INTEGER,
+        verse_end INTEGER,
+        deck INTEGER,
+        label TEXT,
+        CHECK ((deck IS NULL) = (book IS NOT NULL AND chapter IS NOT NULL AND verse IS NOT NULL))
+    );
+    INSERT INTO playlist_items_new (id, playlist, position, book, chapter, verse, verse_end, label)
+        SELECT id, playlist, position, book, chapter, verse, verse_end, label FROM playlist_items;
+    DROP TABLE playlist_items;
+    ALTER TABLE playlist_items_new RENAME TO playlist_items;
+    CREATE INDEX playlist_items_playlist ON playlist_items (playlist, position);
+    ",
 ];
 
 /// Opens (creating and migrating if needed) the user DB.
@@ -389,6 +417,40 @@ mod tests {
         assert_eq!(version(&conn), MIGRATIONS.len() as i64);
         assert_eq!(chapter_marks(&conn, JOHN, 3).unwrap().bookmarks, [16]);
         assert!(crate::playlists::list_playlists(&conn).unwrap().is_empty());
+    }
+
+    #[test]
+    fn upgrades_a_version_4_database_keeping_playlist_passages() {
+        // What the first presentation-mode build created: playlists of passages only.
+        let tmp = TempDb::new("upgrade-v4");
+        {
+            let conn = Connection::open(tmp.path()).unwrap();
+            for sql in &MIGRATIONS[..4] {
+                conn.execute_batch(sql).unwrap();
+            }
+            conn.pragma_update(None, "user_version", 4).unwrap();
+            conn.execute("INSERT INTO playlists (id, name) VALUES (1, 'Sunday')", []).unwrap();
+            conn.execute(
+                "INSERT INTO playlist_items (playlist, position, book, chapter, verse, verse_end, label)
+                 VALUES (1, 0, 19, 100, 1, 5, 'Call to worship'), (1, 1, 43, 3, 16, NULL, NULL)",
+                [],
+            )
+            .unwrap();
+        }
+        let conn = open(&tmp.path()).unwrap();
+        assert_eq!(version(&conn), MIGRATIONS.len() as i64);
+        let items = &crate::playlists::list_playlists(&conn).unwrap()[0].items;
+        assert_eq!(items.len(), 2);
+        assert!(matches!(
+            &items[0],
+            crate::playlists::PlaylistItem::Passage { book: 19, chapter: 100, verse: 1, verse_end: Some(5), label: Some(l), .. } if l == "Call to worship"
+        ));
+        assert!(matches!(&items[1], crate::playlists::PlaylistItem::Passage { book: 43, verse: 16, verse_end: None, .. }));
+        // An item must be exactly one of a passage or a deck.
+        assert!(conn.execute("INSERT INTO playlist_items (playlist, position, label) VALUES (1, 2, 'neither')", []).is_err());
+        assert!(conn
+            .execute("INSERT INTO playlist_items (playlist, position, book, chapter, verse, deck) VALUES (1, 2, 43, 3, 16, 1)", [])
+            .is_err());
     }
 
     #[test]

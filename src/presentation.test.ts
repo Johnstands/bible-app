@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildQueueSlides, buildSlides } from "./presentation";
-import type { Passage } from "./presentation";
+import { buildQueue, buildSlides, itemAt, slideCaption } from "./presentation";
+import type { Passage, QueueEntry, QueuedDeck } from "./presentation";
 
 const john3: Passage = {
   book: 43,
@@ -45,7 +45,8 @@ describe("buildSlides", () => {
   });
 });
 
-describe("buildQueueSlides", () => {
+describe("buildQueue", () => {
+  const buildQueueSlides = (entries: QueueEntry[], g: "verse" | "whole") => buildQueue(entries, g).slides;
   const genesis1: Passage = {
     book: 1,
     chapter: 1,
@@ -56,22 +57,74 @@ describe("buildQueueSlides", () => {
 
   it("flows continuously from one queued passage into the next, across a book boundary", () => {
     const slides = buildQueueSlides([genesis1, john3], "verse");
-    expect(slides.map((s) => s.reference)).toEqual(["Genesis 1:1", "John 3:16", "John 3:17"]);
+    expect(slides.map(slideCaption)).toEqual(["Genesis 1:1", "John 3:16", "John 3:17"]);
   });
 
   it("flows continuously across a chapter boundary within the same book", () => {
     const psalm23: Passage = { book: 19, chapter: 23, title: "Psalm", verses: [{ verse: 1, text: "The LORD is my shepherd…" }] };
     const psalm24: Passage = { book: 19, chapter: 24, title: "Psalm", verses: [{ verse: 1, text: "The earth is the LORD'S…" }] };
     const slides = buildQueueSlides([psalm23, psalm24], "verse");
-    expect(slides.map((s) => `${s.chapter}:${s.verse}`)).toEqual(["23:1", "24:1"]);
+    expect(slides.map((s) => (s.kind === "verse" ? `${s.chapter}:${s.verse}` : ""))).toEqual(["23:1", "24:1"]);
   });
 
   it("keeps whole-passage items as single slides in the flow", () => {
     const slides = buildQueueSlides([genesis1, john3, john3_18], "whole");
-    expect(slides.map((s) => s.reference)).toEqual(["Genesis 1:1", "John 3:16–17", "John 3:18"]);
+    expect(slides.map(slideCaption)).toEqual(["Genesis 1:1", "John 3:16–17", "John 3:18"]);
   });
 
   it("is empty for an empty queue", () => {
-    expect(buildQueueSlides([], "verse")).toEqual([]);
+    expect(buildQueue([], "verse")).toEqual({ slides: [], items: [] });
+  });
+
+  const songs: QueuedDeck = { name: "Songs.png + 2 more", srcs: ["s1", "s2", "s3"] };
+
+  it("expands a deck into one picture slide each, in the flow between passages", () => {
+    const { slides } = buildQueue([genesis1, songs, john3], "verse");
+    expect(slides.map(slideCaption)).toEqual([
+      "Genesis 1:1",
+      "Songs.png + 2 more · 1 of 3",
+      "Songs.png + 2 more · 2 of 3",
+      "Songs.png + 2 more · 3 of 3",
+      "John 3:16",
+      "John 3:17",
+    ]);
+    expect(slides[2]).toEqual({ kind: "image", src: "s2", deckName: "Songs.png + 2 more", index: 1, count: 3 });
+  });
+
+  it("leaves decks alone whatever the verse granularity", () => {
+    expect(buildQueue([songs, john3], "whole").slides.map(slideCaption)).toEqual([
+      "Songs.png + 2 more · 1 of 3",
+      "Songs.png + 2 more · 2 of 3",
+      "Songs.png + 2 more · 3 of 3",
+      "John 3:16–17",
+    ]);
+  });
+
+  it("records where each item starts, keeping a place for items with no slides", () => {
+    const { items } = buildQueue([genesis1, songs, null, john3], "verse");
+    expect(items).toEqual([
+      { start: 0, count: 1 },
+      { start: 1, count: 3 },
+      { start: 4, count: 0 },
+      { start: 4, count: 2 },
+    ]);
+  });
+});
+
+describe("itemAt", () => {
+  const items = [
+    { start: 0, count: 1 },
+    { start: 1, count: 3 },
+    { start: 4, count: 0 },
+    { start: 4, count: 2 },
+  ];
+
+  it("finds the item a slide belongs to, skipping empty items", () => {
+    expect([0, 1, 3, 4, 5].map((i) => itemAt(items, i))).toEqual([0, 1, 1, 3, 3]);
+  });
+
+  it("is -1 past the end or for an empty queue", () => {
+    expect(itemAt(items, 6)).toBe(-1);
+    expect(itemAt([], 0)).toBe(-1);
   });
 });
