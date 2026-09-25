@@ -103,9 +103,18 @@ fn release_to_windowed(win: &tauri::WebviewWindow) {
 /// Idempotent, so it doubles as "redetect the display" when called again (e.g. after a monitor is
 /// plugged in or removed mid-service). Every monitor/geometry call degrades gracefully rather than
 /// panicking — an unplugged display must never crash the app.
+///
+/// Runs off the async-command thread via `spawn_blocking`: building a `WebviewWindow` needs to hop
+/// to the main thread and wait for WebView2's async controller setup to finish, and on Windows that
+/// wait deadlocks if it's issued from a plain sync command (which Tauri runs inline). Moving it to a
+/// blocking-pool thread keeps the async command thread free to service that hop.
 #[tauri::command]
-pub fn present_open(app: AppHandle) -> PresentStatus {
-    let Some(win) = ensure_window(&app) else { return CLOSED };
+pub async fn present_open(app: AppHandle) -> PresentStatus {
+    tauri::async_runtime::spawn_blocking(move || present_open_blocking(&app)).await.unwrap_or(CLOSED)
+}
+
+fn present_open_blocking(app: &AppHandle) -> PresentStatus {
+    let Some(win) = ensure_window(app) else { return CLOSED };
     let monitors: Vec<MonitorInfo> = app.available_monitors().ok().unwrap_or_default().iter().map(MonitorInfo::from).collect();
     let primary = app.primary_monitor().ok().flatten().map(|m| MonitorInfo::from(&m));
 
@@ -113,7 +122,7 @@ pub fn present_open(app: AppHandle) -> PresentStatus {
         Some(mon) => place_fullscreen(&win, mon),
         None => release_to_windowed(&win),
     }
-    status_of(&app)
+    status_of(app)
 }
 
 /// Stops presenting: closes the presentation window if there is one.
