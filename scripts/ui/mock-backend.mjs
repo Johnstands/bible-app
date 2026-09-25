@@ -68,6 +68,7 @@ export function createBackend({ update = null } = {}) {
   const commands = {
     // The updater and app-version commands that Tauri's plugins call.
     "plugin:app|version": () => "0.1.0",
+    "plugin:opener|open_url": () => {},
     "plugin:updater|check": () =>
       update ? { rid: 1, currentVersion: "0.1.0", version: update.version, date: null, body: update.notes ?? null, rawJson: {} } : null,
     // The event plugin: inert here (see the bridge script in harness.mjs) since there is only ever one

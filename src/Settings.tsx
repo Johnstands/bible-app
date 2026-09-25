@@ -38,6 +38,7 @@ interface Props {
   updateVersion: string | null;
   onCheckUpdates: () => void;
   onInstallUpdate: () => void;
+  onShowAbout: () => void;
   onClose: () => void;
 }
 
@@ -64,7 +65,7 @@ function Switch({ label, hint, checked, onChange }: SwitchProps) {
 
 /** Changes apply as you make them, so the page behind the panel is the preview. */
 export function Settings({
-  settings, onChange, onShowVerse, version, updateStatus, updateVersion, onCheckUpdates, onInstallUpdate, onClose,
+  settings, onChange, onShowVerse, version, updateStatus, updateVersion, onCheckUpdates, onInstallUpdate, onShowAbout, onClose,
 }: Props) {
   const panelRef = useRef<HTMLDivElement>(null);
   const set = (patch: Partial<SettingsValue>) => onChange({ ...settings, ...patch });
@@ -223,15 +224,6 @@ export function Settings({
           </section>
 
           <section className="set-section">
-            <h2 className="set-heading">Sources</h2>
-            <p className="set-about">
-              The King James text and its Strong’s numbers are from eBible.org (public domain). Strong’s dictionary is by
-              James Strong (1890, 1894); its JSON edition is by Open Scriptures, licensed CC BY-SA. Cross-references are from
-              OpenBible.info (CC BY), drawn mostly from the public-domain Treasury of Scripture Knowledge.
-            </p>
-          </section>
-
-          <section className="set-section">
             <h2 className="set-heading">Keyboard</h2>
             <dl className="shortcuts">
               {SHORTCUTS.map(([keys, what]) => (
@@ -250,6 +242,9 @@ export function Settings({
         <div className="goto-footer">
           <button className="set-reset" onClick={() => onChange(DEFAULT_SETTINGS)}>
             Reset to defaults
+          </button>
+          <button className="set-reset" onClick={onShowAbout}>
+            About and support
           </button>
           <span>esc to close</span>
         </div>

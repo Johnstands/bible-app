@@ -21,6 +21,7 @@ import type { Neighbor, Target } from "./Chapter";
 import { buildIndex, parseGlossary } from "./glossary";
 import { GoTo } from "./GoTo";
 import type { Destination } from "./GoTo";
+import { About } from "./About";
 import { CrossReferences } from "./CrossReferences";
 import type { RefSource } from "./CrossReferences";
 import { Library } from "./Library";
@@ -64,7 +65,7 @@ function keepInView(el: Element | null) {
 }
 
 /** The full-screen panels. Only one is open at a time. */
-type Panel = "goto" | "search" | "settings" | "library" | "votd" | "refs" | "share" | "plans";
+type Panel = "goto" | "search" | "settings" | "about" | "library" | "votd" | "refs" | "share" | "plans";
 const DEFAULT_POSITION: Position = { book: 1, chapter: 1 };
 
 interface SavedPosition extends Position {
@@ -1145,9 +1146,11 @@ function App() {
           updateVersion={update?.version ?? null}
           onCheckUpdates={() => void checkForUpdate()}
           onInstallUpdate={() => void installUpdate()}
+          onShowAbout={() => setPanel("about")}
           onClose={closePanel}
         />
       )}
+      {panel === "about" && <About version={version} onClose={() => setPanel("settings")} />}
       {panel === "library" && books.length > 0 && <Library books={books} onGo={navigate} onClose={closePanel} />}
       {panel === "plans" && books.length > 0 && (
         <ReadingPlans
