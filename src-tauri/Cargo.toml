@@ -1,6 +1,6 @@
 [package]
 name = "bible-app"
-version = "0.2.1"
+version = "0.2.2"
 description = "A Tauri App"
 authors = ["Johnstands"]
 edition = "2021"
