@@ -58,7 +58,6 @@ export function About({ version, onClose }: Props) {
               presentation mode for church. It works offline, keeps your notes on your own computer, and is free: no
               ads, no accounts, nothing to buy.
             </p>
-            <p className="set-about about-byline">Made by John Carlo Cahimat.</p>
             <button className="set-link" onClick={() => void openUrl(REPO_URL)}>
               Source code on GitHub
             </button>
@@ -73,7 +72,12 @@ export function About({ version, onClose }: Props) {
                 amount is appreciated, and the app stays free either way.
               </p>
               {DONATE_QR ? (
-                <img className="about-qr" src={DONATE_QR} alt="GCash QR code for giving a donation" />
+                <figure className="about-qr-figure">
+                  <div className="about-qr-frame">
+                    <img className="about-qr" src={DONATE_QR} alt="GCash QR code for giving a donation" />
+                  </div>
+                  <figcaption className="about-qr-caption">GCash · InstaPay</figcaption>
+                </figure>
               ) : (
                 <div className="about-qr about-qr--missing">Put the QR image at src/assets/donate-qr.png</div>
               )}

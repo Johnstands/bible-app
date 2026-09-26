@@ -2572,13 +2572,68 @@ kbd {
   margin-top: 0.6rem;
 }
 
+/* The QR sits on a white card (scanners need the light quiet zone, even in the dark themes), framed by gold
+   corner marks like a camera's viewfinder. */
+.about-qr-figure {
+  margin: 1.4rem 0 0.3rem;
+}
+
+.about-qr-frame {
+  --corner: 1.4rem;
+  position: relative;
+  width: fit-content;
+  margin: 0 auto;
+  padding: 0.7rem;
+}
+
+.about-qr-frame::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  --g: linear-gradient(var(--gold), var(--gold));
+  background:
+    var(--g) top left / var(--corner) 2px,
+    var(--g) top left / 2px var(--corner),
+    var(--g) top right / var(--corner) 2px,
+    var(--g) top right / 2px var(--corner),
+    var(--g) bottom left / var(--corner) 2px,
+    var(--g) bottom left / 2px var(--corner),
+    var(--g) bottom right / var(--corner) 2px,
+    var(--g) bottom right / 2px var(--corner);
+  background-repeat: no-repeat;
+  transition: inset 0.25s ease;
+}
+
+.about-qr-frame:hover::before {
+  inset: -0.3rem;
+}
+
 .about-qr {
   display: block;
-  width: 14rem;
+  width: 13rem;
   max-width: 100%;
-  margin: 1rem auto 0.3rem;
-  border-radius: 4px;
-  background: #fff; /* scanners need the light quiet zone, even in the dark themes */
+  padding: 0.8rem;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.08),
+    0 8px 24px -8px color-mix(in srgb, var(--gold) 45%, transparent);
+}
+
+.about-qr-caption {
+  margin-top: 0.9rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--ink-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .about-qr-frame::before {
+    transition: none;
+  }
 }
 
 .about-qr--missing {
@@ -2591,4 +2646,5 @@ kbd {
   color: var(--ink-muted);
   background: none;
   border: 1px dashed var(--rule);
+  box-shadow: none;
 }
